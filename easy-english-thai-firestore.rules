@@ -1,0 +1,689 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function userDocPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function userExists(uid) {
+      return exists(userDocPath(uid));
+    }
+
+    function userDoc(uid) {
+      return get(userDocPath(uid));
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && userExists(request.auth.uid)
+        && userDoc(request.auth.uid).data.role == "admin";
+    }
+
+    function validInterfaceLanguage(v) {
+      return v in ['th', 'en', 'bilingual'];
+    }
+
+    function validLearningGoal(v) {
+      return v in ['daily_life', 'home_conversation', 'travel', 'start_from_zero'];
+    }
+
+    function validVoiceSpeed(v) {
+      return v in ['slow', 'normal'];
+    }
+
+    function validDialogueMode(v) {
+      return v in ['guided', 'repeat', 'open'];
+    }
+
+    function validLessonType(v) {
+      return v in ['standard', 'review', 'sound_focus', 'dialogue_focus'];
+    }
+
+    function validStepType(v) {
+      return v in [
+        'audio_listen',
+        'audio_repeat',
+        'syllable_drill',
+        'word_flashcard',
+        'image_match',
+        'listen_choose',
+        'speak_word',
+        'speak_sentence',
+        'speak_answer',
+        'dialogue_turn',
+        'review_quiz'
+      ];
+    }
+
+    function validLessonProgressStatus(v) {
+      return v in ['not_started', 'in_progress', 'completed'];
+    }
+
+    function validReviewContentType(v) {
+      return v in ['word', 'sound', 'sentence', 'dialogue'];
+    }
+
+    function validVoiceGender(v) {
+      return v in ['male', 'female'];
+    }
+
+    function validDifficultyLevel(v) {
+      return v in ['beginner', 'intermediate', 'advanced'];
+    }
+
+    function validSpeaker(v) {
+      return v in ['app', 'learner'];
+    }
+
+    function isTimestampField(v) {
+      return v is timestamp;
+    }
+
+    function coursePublished(courseId) {
+      return exists(/databases/$(database)/documents/courses/$(courseId))
+        && get(/databases/$(database)/documents/courses/$(courseId)).data.isPublished == true;
+    }
+
+    function lessonPublished(lessonId) {
+      return exists(/databases/$(database)/documents/lessons/$(lessonId))
+        && get(/databases/$(database)/documents/lessons/$(lessonId)).data.isPublished == true;
+    }
+
+    function dialoguePublished(dialogueId) {
+      return exists(/databases/$(database)/documents/dialogues/$(dialogueId))
+        && get(/databases/$(database)/documents/dialogues/$(dialogueId)).data.isPublished == true;
+    }
+
+    function validUserCreate(uid) {
+      return request.resource.data.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.nativeLanguage is string
+        && validInterfaceLanguage(request.resource.data.interfaceLanguage)
+        && validLearningGoal(request.resource.data.learningGoal)
+        && request.resource.data.isGuest is bool
+        && request.resource.data.role == 'learner'
+        && request.resource.data.homeSummary is map
+        && request.resource.data.homeSummary.lessonsCompleted is int
+        && request.resource.data.homeSummary.wordsLearned is int
+        && request.resource.data.homeSummary.streakDays is int
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validUserUpdate(uid) {
+      return request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.nativeLanguage is string
+        && validInterfaceLanguage(request.resource.data.interfaceLanguage)
+        && validLearningGoal(request.resource.data.learningGoal)
+        && request.resource.data.isGuest is bool
+        && request.resource.data.homeSummary is map
+        && request.resource.data.homeSummary.lessonsCompleted is int
+        && request.resource.data.homeSummary.wordsLearned is int
+        && request.resource.data.homeSummary.streakDays is int
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validSettings() {
+      return validInterfaceLanguage(request.resource.data.interfaceLanguage)
+        && request.resource.data.thaiTranslationEnabled is bool
+        && request.resource.data.bilingualMode is bool
+        && validVoiceGender(request.resource.data.preferredVoiceGender)
+        && validVoiceSpeed(request.resource.data.audioSpeedDefault)
+        && request.resource.data.subtitlesEnabled is bool
+        && request.resource.data.notificationsEnabled is bool
+        && request.resource.data.dailyReminderTime is string
+        && request.resource.data.saveRecordings is bool
+        && request.resource.data.strictAnswerMode is bool
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validLessonProgress(lessonId) {
+      return request.resource.data.lessonId == lessonId
+        && validLessonProgressStatus(request.resource.data.status)
+        && request.resource.data.completionPercent is int
+        && request.resource.data.retryCount is int
+        && request.resource.data.timeSpentSeconds is int
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validLessonStepProgress(stepId) {
+      return request.resource.data.stepId == stepId
+        && request.resource.data.status is string
+        && request.resource.data.attempts is int
+        && request.resource.data.timeSpentSeconds is int
+        && request.resource.data.score is map
+        && request.resource.data.responseSummary is map
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validWordProgress(wordId) {
+      return request.resource.data.wordId == wordId
+        && request.resource.data.familiarityScore is number
+        && request.resource.data.pronunciationScore is number
+        && request.resource.data.listeningScore is number
+        && request.resource.data.speakingScore is number
+        && request.resource.data.timesSeen is int
+        && request.resource.data.timesCorrect is int
+        && request.resource.data.timesIncorrect is int
+        && request.resource.data.isHardWord is bool
+        && request.resource.data.isFavorite is bool
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validSoundProgress(soundId) {
+      return request.resource.data.soundId == soundId
+        && request.resource.data.accuracyScore is number
+        && request.resource.data.attemptsCount is int
+        && request.resource.data.difficultyFlag is bool
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validSentenceProgress(sentenceId) {
+      return request.resource.data.sentenceId == sentenceId
+        && request.resource.data.familiarityScore is number
+        && request.resource.data.speakingScore is number
+        && request.resource.data.timesPracticed is int
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validDialogueSession(sessionId) {
+      return request.resource.data.sessionId == sessionId
+        && request.resource.data.dialogueId is string
+        && validDialogueMode(request.resource.data.mode)
+        && request.resource.data.status is string
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validDialogueTurnResponse(turnId) {
+      return request.resource.data.turnId == turnId
+        && (request.resource.data.transcriptText is string || request.resource.data.transcriptText == null)
+        && (request.resource.data.audioPath is string || request.resource.data.audioPath == null)
+        && request.resource.data.accepted is bool
+        && (request.resource.data.score is number || request.resource.data.score == null)
+        && request.resource.data.feedback is string
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    function validSpeakingAttempt(attemptId) {
+      return request.resource.data.attemptId == attemptId
+        && (request.resource.data.lessonStepId is string || request.resource.data.lessonStepId == null)
+        && (request.resource.data.wordId is string || request.resource.data.wordId == null)
+        && (request.resource.data.sentenceId is string || request.resource.data.sentenceId == null)
+        && (request.resource.data.dialogueId is string || request.resource.data.dialogueId == null)
+        && (request.resource.data.recordingPath is string || request.resource.data.recordingPath == null)
+        && (request.resource.data.transcriptText is string || request.resource.data.transcriptText == null)
+        && (request.resource.data.recognitionConfidence is number || request.resource.data.recognitionConfidence == null)
+        && (request.resource.data.pronunciationScore is number || request.resource.data.pronunciationScore == null)
+        && request.resource.data.phonemeFeedback is list
+        && request.resource.data.feedbackText is string
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    function validReviewQueue(reviewId) {
+      return request.resource.data.reviewId == reviewId
+        && validReviewContentType(request.resource.data.contentType)
+        && request.resource.data.contentId is string
+        && isTimestampField(request.resource.data.dueAt)
+        && request.resource.data.priority is int
+        && request.resource.data.sourceReason is string
+        && request.resource.data.exerciseType is string
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    function validReminder() {
+      return request.resource.data.enabled is bool
+        && request.resource.data.dailyTime is string
+        && request.resource.data.timezone is string
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validCourse() {
+      return request.resource.data.id is string
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.sourceLanguage is string
+        && request.resource.data.targetLanguage is string
+        && request.resource.data.version is int
+        && request.resource.data.isPublished is bool
+        && request.resource.data.levelIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validLevel() {
+      return request.resource.data.id is string
+        && request.resource.data.courseId is string
+        && request.resource.data.order is int
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.moduleIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validModule() {
+      return request.resource.data.id is string
+        && request.resource.data.levelId is string
+        && request.resource.data.order is int
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.unitIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validUnit() {
+      return request.resource.data.id is string
+        && request.resource.data.moduleId is string
+        && request.resource.data.order is int
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.lessonIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validLesson(lessonId) {
+      return request.resource.data.id == lessonId
+        && request.resource.data.unitId is string
+        && request.resource.data.courseId is string
+        && request.resource.data.levelId is string
+        && request.resource.data.weekNumber is int
+        && request.resource.data.lessonOrder is int
+        && request.resource.data.title is string
+        && (request.resource.data.subtitle is string || request.resource.data.subtitle == null)
+        && request.resource.data.estimatedMinutes is int
+        && validLessonType(request.resource.data.lessonType)
+        && request.resource.data.soundFocus is map
+        && request.resource.data.soundFocus.id is string
+        && request.resource.data.soundFocus.label is string
+        && request.resource.data.isReviewLesson is bool
+        && request.resource.data.isPublished is bool
+        && request.resource.data.targetWordIds is list
+        && request.resource.data.targetSentenceIds is list
+        && request.resource.data.stepCount is int
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validLessonStep(stepId) {
+      return request.resource.data.id == stepId
+        && request.resource.data.stepOrder is int
+        && validStepType(request.resource.data.stepType)
+        && (request.resource.data.title is string || request.resource.data.title == null)
+        && request.resource.data.instructionEn is string
+        && request.resource.data.instructionTh is string
+        && request.resource.data.payload is map
+        && request.resource.data.passingRule is map;
+    }
+
+    function validSound(soundId) {
+      return request.resource.data.id == soundId
+        && request.resource.data.soundCode is string
+        && request.resource.data.displaySymbol is string
+        && request.resource.data.title is string
+        && request.resource.data.descriptionTh is string
+        && (request.resource.data.mouthHint is string || request.resource.data.mouthHint == null)
+        && request.resource.data.category is string
+        && request.resource.data.thaiDifficultyFlag is bool
+        && request.resource.data.audioDemoNormalUrl is string
+        && request.resource.data.audioDemoSlowUrl is string
+        && request.resource.data.exampleWords is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validWord(wordId) {
+      return request.resource.data.id == wordId
+        && request.resource.data.englishText is string
+        && request.resource.data.thaiText is string
+        && (request.resource.data.transliteration is string || request.resource.data.transliteration == null)
+        && (request.resource.data.pronunciationHint is string || request.resource.data.pronunciationHint == null)
+        && (request.resource.data.ipa is string || request.resource.data.ipa == null)
+        && request.resource.data.syllableSplit is list
+        && request.resource.data.partOfSpeech is string
+        && request.resource.data.category is string
+        && validDifficultyLevel(request.resource.data.difficultyLevel)
+        && request.resource.data.frequencyRank is int
+        && (request.resource.data.imageUrl is string || request.resource.data.imageUrl == null)
+        && request.resource.data.audioNormalUrl is string
+        && request.resource.data.audioSlowUrl is string
+        && request.resource.data.soundIds is list
+        && request.resource.data.exampleSentence is map
+        && request.resource.data.lessonIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validSentence(sentenceId) {
+      return request.resource.data.id == sentenceId
+        && request.resource.data.englishText is string
+        && request.resource.data.thaiText is string
+        && (request.resource.data.pronunciationHint is string || request.resource.data.pronunciationHint == null)
+        && (request.resource.data.ipa is string || request.resource.data.ipa == null)
+        && request.resource.data.sentencePatternId is string
+        && validDifficultyLevel(request.resource.data.difficultyLevel)
+        && request.resource.data.audioNormalUrl is string
+        && request.resource.data.audioSlowUrl is string
+        && request.resource.data.targetWordIds is list
+        && request.resource.data.lessonIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validSentencePattern(patternId) {
+      return request.resource.data.id == patternId
+        && request.resource.data.patternText is string
+        && request.resource.data.patternTextTh is string
+        && request.resource.data.explanationTh is string
+        && validDifficultyLevel(request.resource.data.difficultyLevel)
+        && request.resource.data.exampleSentenceIds is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validDialogue(dialogueId) {
+      return request.resource.data.id == dialogueId
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.contextType is string
+        && validDialogueMode(request.resource.data.mode)
+        && request.resource.data.levelId is string
+        && request.resource.data.isPublished is bool
+        && request.resource.data.targetPhrases is list
+        && request.resource.data.validationConfig is map
+        && request.resource.data.turnCount is int
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validDialogueTurn(turnId) {
+      return request.resource.data.id == turnId
+        && request.resource.data.turnOrder is int
+        && validSpeaker(request.resource.data.speaker)
+        && (request.resource.data.text is string || request.resource.data.text == null)
+        && (request.resource.data.thaiText is string || request.resource.data.thaiText == null)
+        && (request.resource.data.audioUrl is string || request.resource.data.audioUrl == null)
+        && (request.resource.data.expectedAnswers is list || request.resource.data.expectedAnswers == null)
+        && (request.resource.data.validationType is string || request.resource.data.validationType == null)
+        && (request.resource.data.hintText is string || request.resource.data.hintText == null);
+    }
+
+    function validMinimalPairGroup(groupId) {
+      return request.resource.data.id == groupId
+        && request.resource.data.title is string
+        && request.resource.data.soundA is map
+        && request.resource.data.soundB is map
+        && request.resource.data.items is list
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    function validDownloadPack(packId) {
+      return request.resource.data.id == packId
+        && request.resource.data.title is string
+        && request.resource.data.sizeMb is number
+        && request.resource.data.assetCount is int
+        && request.resource.data.isPublished is bool
+        && request.resource.data.files is list
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validAchievement(achievementId) {
+      return request.resource.data.id == achievementId
+        && request.resource.data.code is string
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && (request.resource.data.iconUrl is string || request.resource.data.iconUrl == null)
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && validUserCreate(uid);
+      allow update: if isOwner(uid) && validUserUpdate(uid);
+      allow delete: if false;
+
+      match /settings/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validSettings();
+        allow delete: if false;
+      }
+
+      match /onboardingSessions/{sessionId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid);
+        allow delete: if false;
+
+        match /answers/{questionId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update: if isOwner(uid);
+          allow delete: if false;
+        }
+      }
+
+      match /lessonProgress/{lessonId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validLessonProgress(lessonId);
+        allow delete: if false;
+
+        match /steps/{stepId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update: if isOwner(uid) && validLessonStepProgress(stepId);
+          allow delete: if false;
+        }
+      }
+
+      match /wordProgress/{wordId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validWordProgress(wordId);
+        allow delete: if false;
+      }
+
+      match /soundProgress/{soundId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validSoundProgress(soundId);
+        allow delete: if false;
+      }
+
+      match /sentenceProgress/{sentenceId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validSentenceProgress(sentenceId);
+        allow delete: if false;
+      }
+
+      match /dialogueSessions/{sessionId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validDialogueSession(sessionId);
+        allow delete: if false;
+
+        match /turns/{turnId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update: if isOwner(uid) && validDialogueTurnResponse(turnId);
+          allow delete: if false;
+        }
+      }
+
+      match /speakingAttempts/{attemptId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validSpeakingAttempt(attemptId);
+        allow delete: if false;
+      }
+
+      match /reviewQueue/{reviewId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validReviewQueue(reviewId);
+        allow delete: if false;
+      }
+
+      match /achievements/{achievementId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isAdmin();
+        allow delete: if false;
+      }
+
+      match /deviceTokens/{tokenId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      match /downloads/{packId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      match /reminders/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid) && validReminder();
+        allow delete: if false;
+      }
+
+      match /derived/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /courses/{courseId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update: if isAdmin() && validCourse();
+      allow delete: if false;
+    }
+
+    match /levels/{levelId} {
+      allow read: if isAdmin() || coursePublished(resource.data.courseId);
+      allow create, update: if isAdmin() && validLevel();
+      allow delete: if false;
+    }
+
+    match /modules/{moduleId} {
+      allow read: if isAdmin()
+        || (
+          exists(/databases/$(database)/documents/levels/$(resource.data.levelId))
+          && coursePublished(
+            get(/databases/$(database)/documents/levels/$(resource.data.levelId)).data.courseId
+          )
+        );
+      allow create, update: if isAdmin() && validModule();
+      allow delete: if false;
+    }
+
+    match /units/{unitId} {
+      allow read: if isAdmin()
+        || (
+          exists(/databases/$(database)/documents/modules/$(resource.data.moduleId))
+          && exists(/databases/$(database)/documents/levels/$(
+            get(/databases/$(database)/documents/modules/$(resource.data.moduleId)).data.levelId
+          ))
+          && coursePublished(
+            get(/databases/$(database)/documents/levels/$(
+              get(/databases/$(database)/documents/modules/$(resource.data.moduleId)).data.levelId
+            )).data.courseId
+          )
+        );
+      allow create, update: if isAdmin() && validUnit();
+      allow delete: if false;
+    }
+
+    match /lessons/{lessonId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update: if isAdmin() && validLesson(lessonId);
+      allow delete: if false;
+
+      match /steps/{stepId} {
+        allow read: if lessonPublished(lessonId) || isAdmin();
+        allow create, update: if isAdmin() && validLessonStep(stepId);
+        allow delete: if false;
+      }
+    }
+
+    match /sounds/{soundId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validSound(soundId);
+      allow delete: if false;
+    }
+
+    match /words/{wordId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validWord(wordId);
+      allow delete: if false;
+    }
+
+    match /sentences/{sentenceId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validSentence(sentenceId);
+      allow delete: if false;
+    }
+
+    match /sentencePatterns/{patternId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validSentencePattern(patternId);
+      allow delete: if false;
+    }
+
+    match /dialogues/{dialogueId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update: if isAdmin() && validDialogue(dialogueId);
+      allow delete: if false;
+
+      match /turns/{turnId} {
+        allow read: if dialoguePublished(dialogueId) || isAdmin();
+        allow create, update: if isAdmin() && validDialogueTurn(turnId);
+        allow delete: if false;
+      }
+    }
+
+    match /minimalPairGroups/{groupId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validMinimalPairGroup(groupId);
+      allow delete: if false;
+    }
+
+    match /downloadPacks/{packId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update: if isAdmin() && validDownloadPack(packId);
+      allow delete: if false;
+    }
+
+    match /achievements/{achievementId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validAchievement(achievementId);
+      allow delete: if false;
+    }
+
+    match /appConfig/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /analyticsEvents/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.eventName is string
+        && isTimestampField(request.resource.data.eventTime)
+        && request.resource.data.properties is map;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /contentQaIssues/{issueId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

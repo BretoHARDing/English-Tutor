@@ -1,0 +1,5233 @@
+openapi: 3.1.0
+info:
+  title: Easy English Thai API
+  version: 1.0.0
+  summary: Pronunciation-first beginner English learning API for Thai speakers
+  description: |
+    REST API for a mobile-first English learning app focused on Thai-speaking beginners.
+    Supports onboarding, lessons, words, sounds, reviews, pronunciation scoring,
+    dialogues, downloads, notifications, analytics, and admin CMS operations.
+  contact:
+    name: API Team
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.yourapp.com/v1
+    description: Production
+  - url: https://staging-api.yourapp.com/v1
+    description: Staging
+
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+
+tags:
+  - name: Auth
+  - name: Me
+  - name: Onboarding
+  - name: Courses
+  - name: Lessons
+  - name: Words
+  - name: Sentences
+  - name: Sounds
+  - name: MinimalPairs
+  - name: Home
+  - name: Progress
+  - name: Review
+  - name: Speech
+  - name: Dialogues
+  - name: Downloads
+  - name: Notifications
+  - name: Achievements
+  - name: Search
+  - name: Analytics
+  - name: AdminLessons
+  - name: AdminWords
+  - name: AdminSentences
+  - name: AdminSounds
+  - name: AdminDialogues
+  - name: AdminAssets
+  - name: AdminQA
+  - name: AdminAnalytics
+
+externalDocs:
+  description: Internal API guidelines
+  url: https://docs.yourapp.com/api-guidelines
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /health:
+    get:
+      tags: [Analytics]
+      summary: Health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  version:
+                    type: string
+                required: [status, version]
+              examples:
+                default:
+                  value:
+                    status: ok
+                    version: 1.0.0
+
+  /auth/guest:
+    post:
+      tags: [Auth]
+      summary: Create guest session
+      operationId: createGuestSession
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGuestSessionRequest'
+
+            examples:
+              default:
+                value:
+                  device_id: device_abc123
+                  interface_language: th
+                  app_version: 1.0.0
+      responses:
+        '200':
+          description: Guest session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/AuthResponseExample'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register account
+      operationId: signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+
+            examples:
+              default:
+                value:
+                  email: user@example.com
+                  password: StrongPassword123!
+                  display_name: Mali
+                  interface_language: th
+      responses:
+        '200':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/AuthResponseExample'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+
+            examples:
+              default:
+                value:
+                  email: user@example.com
+                  password: StrongPassword123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/AuthResponseExample'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+
+            examples:
+              default:
+                value:
+                  refresh_token: jwt_refresh_token
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/upgrade-guest:
+    post:
+      tags: [Auth]
+      summary: Convert guest account into registered account
+      operationId: upgradeGuest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpgradeGuestRequest'
+      responses:
+        '200':
+          description: Guest upgraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeGuestResponse'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Logout completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+
+  /me:
+    get:
+      tags: [Me]
+      summary: Get current user profile
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMeResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        id: user_001
+                        email: user@example.com
+                        display_name: Mali
+                        native_language: th
+                        interface_language: th
+                        learning_goal: daily_life
+                        current_level_id: level_0
+                        current_lesson_id: lesson_001
+                        is_guest: false
+                        created_at: '2026-04-07T09:30:00Z'
+                      meta: {}
+                      error: null
+    patch:
+      tags: [Me]
+      summary: Update current user profile
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeRequest'
+
+            examples:
+              default:
+                value:
+                  display_name: Mali
+                  learning_goal: home_conversation
+                  native_language: th
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMeResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        id: user_001
+                        email: user@example.com
+                        display_name: Mali
+                        native_language: th
+                        interface_language: th
+                        learning_goal: daily_life
+                        current_level_id: level_0
+                        current_lesson_id: lesson_001
+                        is_guest: false
+                        created_at: '2026-04-07T09:30:00Z'
+                      meta: {}
+                      error: null
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /me/settings:
+    get:
+      tags: [Me]
+      summary: Get learner settings
+      operationId: getMySettings
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSettingsResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        interface_language: th
+                        thai_translation_enabled: true
+                        bilingual_mode: true
+                        preferred_voice_gender: female
+                        audio_speed_default: normal
+                        subtitles_enabled: true
+                        notifications_enabled: true
+                        daily_reminder_time: '19:00:00'
+                        save_recordings: true
+                        strict_answer_mode: false
+                      meta: {}
+                      error: null
+    patch:
+      tags: [Me]
+      summary: Update learner settings
+      operationId: updateMySettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+
+            examples:
+              default:
+                value:
+                  preferred_voice_gender: female
+                  audio_speed_default: slow
+                  daily_reminder_time: '20:00:00'
+                  thai_translation_enabled: true
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedFlagResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /me/recordings:
+    delete:
+      tags: [Me]
+      summary: Delete learner recordings
+      operationId: deleteMyRecordings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRecordingsRequest'
+      responses:
+        '200':
+          description: Recordings deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteRecordingsResponse'
+
+  /onboarding/start:
+    post:
+      tags: [Onboarding]
+      summary: Start onboarding session
+      operationId: startOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartOnboardingRequest'
+      responses:
+        '200':
+          description: Onboarding started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartOnboardingResponse'
+
+  /onboarding/profile:
+    post:
+      tags: [Onboarding]
+      summary: Submit onboarding profile
+      operationId: submitOnboardingProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingProfileRequest'
+      responses:
+        '200':
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedFlagResponse'
+
+  /onboarding/placement-answer:
+    post:
+      tags: [Onboarding]
+      summary: Submit placement answer
+      operationId: submitPlacementAnswer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlacementAnswerRequest'
+      responses:
+        '200':
+          description: Placement answer accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacementAnswerResponse'
+
+  /onboarding/complete:
+    post:
+      tags: [Onboarding]
+      summary: Complete onboarding
+      operationId: completeOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteOnboardingRequest'
+      responses:
+        '200':
+          description: Onboarding completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteOnboardingResponse'
+
+  /courses:
+    get:
+      tags: [Courses]
+      summary: List courses
+      operationId: listCourses
+      parameters:
+        - $ref: '#/components/parameters/SourceLanguage'
+        - $ref: '#/components/parameters/TargetLanguage'
+        - $ref: '#/components/parameters/Published'
+      responses:
+        '200':
+          description: Courses listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCoursesResponse'
+
+  /courses/{courseId}:
+    get:
+      tags: [Courses]
+      summary: Get course detail
+      operationId: getCourse
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '200':
+          description: Course detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCourseResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /courses/{courseId}/map:
+    get:
+      tags: [Courses]
+      summary: Get course map
+      operationId: getCourseMap
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        '200':
+          description: Course map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCourseMapResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /units/{unitId}/lessons:
+    get:
+      tags: [Courses]
+      summary: List lessons in unit
+      operationId: listUnitLessons
+      parameters:
+        - $ref: '#/components/parameters/UnitId'
+      responses:
+        '200':
+          description: Unit lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListLessonsResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /home:
+    get:
+      tags: [Home]
+      summary: Get learner home dashboard
+      operationId: getHome
+      responses:
+        '200':
+          description: Home dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetHomeResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetHomeResponseExample'
+
+  /progress:
+    get:
+      tags: [Progress]
+      summary: Get learner progress dashboard
+      operationId: getProgress
+      responses:
+        '200':
+          description: Progress dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProgressResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        course_completion_percent: 14
+                        lessons_completed: 8
+                        words_learned: 41
+                        dialogues_completed: 3
+                        streak_days: 6
+                        pronunciation_trend:
+                          - week: 1
+                            score: 62
+                          - week: 2
+                            score: 67
+                        weak_sounds:
+                          - sound_id: sound_r
+                            label: R
+                            accuracy_score: 41
+                        achievements:
+                          - code: first_lesson_complete
+                            title: First Lesson Complete
+                      meta: {}
+                      error: null
+
+  /lessons/{lessonId}:
+    get:
+      tags: [Lessons]
+      summary: Get lesson detail
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLessonResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetLessonResponseExample'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /lessons/{lessonId}/steps:
+    get:
+      tags: [Lessons]
+      summary: Get lesson steps
+      operationId: getLessonSteps
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson steps
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLessonStepsResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetLessonStepsResponseExample'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /lessons/{lessonId}/start:
+    post:
+      tags: [Lessons]
+      summary: Start lesson
+      operationId: startLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartLessonRequest'
+
+            examples:
+              default:
+                value:
+                  source: home
+      responses:
+        '200':
+          description: Lesson started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartLessonResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        lesson_progress_id: lp_001
+                        status: in_progress
+                        started_at: '2026-04-07T09:35:00Z'
+                      meta: {}
+                      error: null
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /lessons/{lessonId}/progress:
+    get:
+      tags: [Lessons]
+      summary: Get lesson progress
+      operationId: getLessonProgress
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLessonProgressResponse'
+
+  /lessons/{lessonId}/steps/{stepId}/progress:
+    post:
+      tags: [Lessons]
+      summary: Save lesson step progress
+      operationId: saveLessonStepProgress
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/StepId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLessonStepProgressRequest'
+      responses:
+        '200':
+          description: Step progress saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveLessonStepProgressResponse'
+
+  /lessons/{lessonId}/complete:
+    post:
+      tags: [Lessons]
+      summary: Complete lesson
+      operationId: completeLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteLessonRequest'
+
+            examples:
+              default:
+                value:
+                  final_score:
+                    overall: 81
+                    pronunciation: 74
+                    comprehension: 89
+      responses:
+        '200':
+          description: Lesson completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteLessonResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        lesson_id: lesson_009
+                        status: completed
+                        completed_at: '2026-04-07T09:48:00Z'
+                        awards:
+                          - code: lesson_complete
+                            title: Lesson Complete
+                        recommended_next_actions:
+                          - type: lesson
+                            target_id: lesson_010
+                            title: Next Lesson
+                          - type: review
+                            target_id: review_words_hard
+                            title: Review Hard Words
+                      meta: {}
+                      error: null
+
+  /words:
+    get:
+      tags: [Words]
+      summary: List words
+      operationId: listWords
+      parameters:
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/LessonIdQuery'
+        - $ref: '#/components/parameters/Difficulty'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/Favorites'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Words listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListWordsResponse'
+
+  /words/{wordId}:
+    get:
+      tags: [Words]
+      summary: Get word detail
+      operationId: getWord
+      parameters:
+        - $ref: '#/components/parameters/WordId'
+      responses:
+        '200':
+          description: Word detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetWordResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetWordResponseExample'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /words/{wordId}/progress:
+    get:
+      tags: [Words]
+      summary: Get word progress
+      operationId: getWordProgress
+      parameters:
+        - $ref: '#/components/parameters/WordId'
+      responses:
+        '200':
+          description: Word progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetWordProgressResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        word_id: word_water
+                        familiarity_score: 72
+                        pronunciation_score: 69
+                        listening_score: 80
+                        speaking_score: 68
+                        times_seen: 6
+                        times_correct: 5
+                        times_incorrect: 1
+                        last_seen_at: '2026-04-07T09:47:00Z'
+                        next_review_at: '2026-04-08T09:00:00Z'
+                        is_hard_word: false
+                      meta: {}
+                      error: null
+    post:
+      tags: [Words]
+      summary: Update word progress
+      operationId: updateWordProgress
+      parameters:
+        - $ref: '#/components/parameters/WordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWordProgressRequest'
+
+            examples:
+              default:
+                value:
+                  event_type: review_answered
+                  result: correct
+                  speaking_score: 74
+                  listening_score: 82
+                  mark_hard: false
+      responses:
+        '200':
+          description: Word progress updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateWordProgressResponse'
+
+  /words/{wordId}/favorite:
+    post:
+      tags: [Words]
+      summary: Toggle favorite word
+      operationId: toggleFavoriteWord
+      parameters:
+        - $ref: '#/components/parameters/WordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToggleFavoriteRequest'
+      responses:
+        '200':
+          description: Favorite updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToggleFavoriteResponse'
+
+  /sentences/{sentenceId}:
+    get:
+      tags: [Sentences]
+      summary: Get sentence detail
+      operationId: getSentence
+      parameters:
+        - $ref: '#/components/parameters/SentenceId'
+      responses:
+        '200':
+          description: Sentence detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSentenceResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetSentenceResponseExample'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /sentences/{sentenceId}/progress:
+    get:
+      tags: [Sentences]
+      summary: Get sentence progress
+      operationId: getSentenceProgress
+      parameters:
+        - $ref: '#/components/parameters/SentenceId'
+      responses:
+        '200':
+          description: Sentence progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSentenceProgressResponse'
+
+  /sentence-patterns:
+    get:
+      tags: [Sentences]
+      summary: List sentence patterns
+      operationId: listSentencePatterns
+      responses:
+        '200':
+          description: Sentence patterns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSentencePatternsResponse'
+
+  /sounds:
+    get:
+      tags: [Sounds]
+      summary: List sounds
+      operationId: listSounds
+      parameters:
+        - $ref: '#/components/parameters/Category'
+        - $ref: '#/components/parameters/ThaiDifficulty'
+      responses:
+        '200':
+          description: Sounds listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSoundsResponse'
+
+  /sounds/{soundId}:
+    get:
+      tags: [Sounds]
+      summary: Get sound detail
+      operationId: getSound
+      parameters:
+        - $ref: '#/components/parameters/SoundId'
+      responses:
+        '200':
+          description: Sound detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSoundResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetSoundResponseExample'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /sounds/{soundId}/progress:
+    get:
+      tags: [Sounds]
+      summary: Get sound progress
+      operationId: getSoundProgress
+      parameters:
+        - $ref: '#/components/parameters/SoundId'
+      responses:
+        '200':
+          description: Sound progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSoundProgressResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        sound_id: sound_r
+                        accuracy_score: 41
+                        attempts_count: 12
+                        last_practiced_at: '2026-04-07T09:10:00Z'
+                        next_review_at: '2026-04-08T09:00:00Z'
+                        difficulty_flag: true
+                      meta: {}
+                      error: null
+    post:
+      tags: [Sounds]
+      summary: Update sound progress
+      operationId: updateSoundProgress
+      parameters:
+        - $ref: '#/components/parameters/SoundId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSoundProgressRequest'
+      responses:
+        '200':
+          description: Sound progress updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedFlagResponse'
+
+  /minimal-pairs/{groupId}:
+    get:
+      tags: [MinimalPairs]
+      summary: Get minimal pair group
+      operationId: getMinimalPairGroup
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Minimal pair group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetMinimalPairGroupResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /review:
+    get:
+      tags: [Review]
+      summary: Get review hub summary
+      operationId: getReviewSummary
+      responses:
+        '200':
+          description: Review summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReviewSummaryResponse'
+
+  /review/queue:
+    get:
+      tags: [Review]
+      summary: Get review queue
+      operationId: getReviewQueue
+      parameters:
+        - $ref: '#/components/parameters/ReviewMode'
+        - $ref: '#/components/parameters/ContentType'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Review queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetReviewQueueResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/GetReviewQueueResponseExample'
+
+  /review/{reviewId}/complete:
+    post:
+      tags: [Review]
+      summary: Submit review result
+      operationId: completeReviewItem
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteReviewItemRequest'
+      responses:
+        '200':
+          description: Review result accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteReviewItemResponse'
+
+  /weekly-review/{weekId}:
+    get:
+      tags: [Review]
+      summary: Get weekly review summary
+      operationId: getWeeklyReview
+      parameters:
+        - $ref: '#/components/parameters/WeekId'
+      responses:
+        '200':
+          description: Weekly review summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetWeeklyReviewResponse'
+
+  /weekly-review/{weekId}/complete:
+    post:
+      tags: [Review]
+      summary: Complete weekly review
+      operationId: completeWeeklyReview
+      parameters:
+        - $ref: '#/components/parameters/WeekId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteWeeklyReviewRequest'
+      responses:
+        '200':
+          description: Weekly review completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteWeeklyReviewResponse'
+
+  /speech/uploads:
+    post:
+      tags: [Speech]
+      summary: Create upload target for learner recording
+      operationId: createSpeechUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpeechUploadRequest'
+
+            examples:
+              default:
+                value:
+                  content_type: audio/m4a
+                  context:
+                    lesson_id: lesson_009
+                    step_id: step_004
+      responses:
+        '200':
+          description: Upload target created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSpeechUploadResponse'
+
+  /speech/transcribe:
+    post:
+      tags: [Speech]
+      summary: Transcribe learner recording
+      operationId: transcribeSpeech
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeSpeechRequest'
+
+            examples:
+              default:
+                value:
+                  audio_asset_url: https://cdn.yourapp.com/user-audio/upl_001.m4a
+                  language: en
+                  context:
+                    type: lesson_step
+                    lesson_id: lesson_009
+                    step_id: step_004
+      responses:
+        '200':
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeSpeechResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/TranscribeSpeechResponseExample'
+        '422':
+          $ref: '#/components/responses/SpeechProcessingError'
+
+  /speech/pronunciation/word:
+    post:
+      tags: [Speech]
+      summary: Score pronunciation for a word
+      operationId: scoreWordPronunciation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreWordPronunciationRequest'
+
+            examples:
+              default:
+                value:
+                  audio_asset_url: https://cdn.yourapp.com/user-audio/upl_001.m4a
+                  target_word_id: word_water
+                  target_text: water
+      responses:
+        '200':
+          description: Word pronunciation score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreWordPronunciationResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/ScoreWordPronunciationResponseExample'
+
+  /speech/pronunciation/sentence:
+    post:
+      tags: [Speech]
+      summary: Score pronunciation for a sentence
+      operationId: scoreSentencePronunciation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreSentencePronunciationRequest'
+
+            examples:
+              default:
+                value:
+                  audio_asset_url: https://cdn.yourapp.com/user-audio/upl_001.m4a
+                  target_sentence_id: sentence_i_want_water
+                  target_text: I want water.
+      responses:
+        '200':
+          description: Sentence pronunciation score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSentencePronunciationResponse'
+
+  /speech/pronunciation/sound:
+    post:
+      tags: [Speech]
+      summary: Score pronunciation for a sound
+      operationId: scoreSoundPronunciation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreSoundPronunciationRequest'
+
+            examples:
+              default:
+                value:
+                  audio_asset_url: https://cdn.yourapp.com/user-audio/upl_001.m4a
+                  target_sound_id: sound_r
+      responses:
+        '200':
+          description: Sound pronunciation score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSoundPronunciationResponse'
+
+  /speech/attempts:
+    post:
+      tags: [Speech]
+      summary: Save speaking attempt metadata
+      operationId: saveSpeechAttempt
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveSpeechAttemptRequest'
+      responses:
+        '200':
+          description: Speaking attempt saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveSpeechAttemptResponse'
+
+  /dialogues:
+    get:
+      tags: [Dialogues]
+      summary: List dialogues
+      operationId: listDialogues
+      parameters:
+        - $ref: '#/components/parameters/Context'
+        - $ref: '#/components/parameters/LevelIdQuery'
+        - $ref: '#/components/parameters/DialogueMode'
+      responses:
+        '200':
+          description: Dialogues listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDialoguesResponse'
+
+  /dialogues/{dialogueId}:
+    get:
+      tags: [Dialogues]
+      summary: Get dialogue detail
+      operationId: getDialogue
+      parameters:
+        - $ref: '#/components/parameters/DialogueId'
+      responses:
+        '200':
+          description: Dialogue detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDialogueResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        id: dialogue_food_001
+                        title: Ordering Water
+                        description: Practice asking for a drink
+                        context: food
+                        mode: guided
+                        target_phrases:
+                          - I want water.
+                          - Yes, please.
+                      meta: {}
+                      error: null
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /dialogues/{dialogueId}/turns:
+    get:
+      tags: [Dialogues]
+      summary: Get dialogue turns
+      operationId: getDialogueTurns
+      parameters:
+        - $ref: '#/components/parameters/DialogueId'
+      responses:
+        '200':
+          description: Dialogue turns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDialogueTurnsResponse'
+
+                examples:
+                  default:
+                    value:
+                      data:
+                        - turn_id: turn_001
+                          speaker: app
+                          text: Do you want water?
+                          thai_text: คุณต้องการน้ำไหม
+                          audio_url: https://cdn.yourapp.com/audio/dialogues/do_you_want_water.mp3
+                        - turn_id: turn_002
+                          speaker: learner
+                          expected_answers:
+                            - Yes, please.
+                            - Yes please.
+                          validation_type: exact_or_normalized
+                          hint_text: 'Say: Yes, please.'
+                      meta: {}
+                      error: null
+
+  /dialogues/{dialogueId}/start:
+    post:
+      tags: [Dialogues]
+      summary: Start dialogue session
+      operationId: startDialogueSession
+      parameters:
+        - $ref: '#/components/parameters/DialogueId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDialogueSessionRequest'
+
+            examples:
+              default:
+                value:
+                  mode: guided
+      responses:
+        '200':
+          description: Dialogue session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartDialogueSessionResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/StartDialogueSessionResponseExample'
+
+  /dialogue-sessions/{sessionId}/respond:
+    post:
+      tags: [Dialogues]
+      summary: Submit dialogue response
+      operationId: respondDialogueSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespondDialogueSessionRequest'
+
+            examples:
+              default:
+                value:
+                  turn_id: turn_002
+                  audio_asset_url: https://cdn.yourapp.com/user-audio/upl_002.m4a
+                  transcript_text: Yes, please.
+      responses:
+        '200':
+          description: Dialogue response processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespondDialogueSessionResponse'
+                examples:
+                  default:
+                    $ref: '#/components/examples/RespondDialogueSessionResponseExample'
+        '422':
+          $ref: '#/components/responses/DialogueValidationError'
+
+  /dialogue-sessions/{sessionId}/retry:
+    post:
+      tags: [Dialogues]
+      summary: Retry current dialogue turn
+      operationId: retryDialogueSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryDialogueSessionRequest'
+      responses:
+        '200':
+          description: Retry information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetryDialogueSessionResponse'
+
+  /dialogue-sessions/{sessionId}/complete:
+    post:
+      tags: [Dialogues]
+      summary: Complete dialogue session
+      operationId: completeDialogueSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteDialogueSessionRequest'
+      responses:
+        '200':
+          description: Dialogue session completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteDialogueSessionResponse'
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Search words, sentences, and dialogues
+      operationId: searchContent
+      parameters:
+        - $ref: '#/components/parameters/SearchQueryRequired'
+        - $ref: '#/components/parameters/SearchTypes'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+
+  /downloads/packs:
+    get:
+      tags: [Downloads]
+      summary: List downloadable content packs
+      operationId: listDownloadPacks
+      responses:
+        '200':
+          description: Download packs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDownloadPacksResponse'
+
+  /downloads/packs/{packId}:
+    get:
+      tags: [Downloads]
+      summary: Get download pack manifest
+      operationId: getDownloadPack
+      parameters:
+        - $ref: '#/components/parameters/PackId'
+      responses:
+        '200':
+          description: Download pack manifest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDownloadPackResponse'
+
+  /achievements:
+    get:
+      tags: [Achievements]
+      summary: List learner achievements
+      operationId: listAchievements
+      responses:
+        '200':
+          description: Achievements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAchievementsResponse'
+
+  /notifications/device-token:
+    post:
+      tags: [Notifications]
+      summary: Register push device token
+      operationId: registerDeviceToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceTokenRequest'
+      responses:
+        '200':
+          description: Device token registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredFlagResponse'
+
+  /notifications/reminders:
+    post:
+      tags: [Notifications]
+      summary: Set reminder preferences
+      operationId: setReminderPreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetReminderPreferencesRequest'
+
+            examples:
+              default:
+                value:
+                  enabled: true
+                  daily_time: '19:30:00'
+                  timezone: Asia/Bangkok
+      responses:
+        '200':
+          description: Reminder settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedFlagResponse'
+
+  /analytics/events:
+    post:
+      tags: [Analytics]
+      summary: Submit client analytics events
+      operationId: submitAnalyticsEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnalyticsEventsRequest'
+
+            examples:
+              default:
+                value:
+                  events:
+                    - event_name: lesson_started
+                      event_time: '2026-04-07T09:35:00Z'
+                      properties:
+                        lesson_id: lesson_009
+                        source: home
+      responses:
+        '200':
+          description: Events accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAnalyticsEventsResponse'
+
+  /admin/lessons:
+    get:
+      tags: [AdminLessons]
+      summary: List lessons for admin CMS
+      operationId: adminListLessons
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/UnitIdQuery'
+        - $ref: '#/components/parameters/Published'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Admin lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminListLessonsResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags: [AdminLessons]
+      summary: Create lesson
+      operationId: adminCreateLesson
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateLessonRequest'
+            examples:
+              default:
+                $ref: '#/components/examples/AdminCreateLessonRequestExample'
+      responses:
+        '201':
+          description: Lesson created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/lessons/{lessonId}:
+    patch:
+      tags: [AdminLessons]
+      summary: Update lesson
+      operationId: adminUpdateLesson
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateLessonRequest'
+      responses:
+        '200':
+          description: Lesson updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedFlagResponse'
+
+  /admin/lessons/{lessonId}/steps:
+    post:
+      tags: [AdminLessons]
+      summary: Add lesson step
+      operationId: adminAddLessonStep
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAddLessonStepRequest'
+      responses:
+        '201':
+          description: Lesson step created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/lessons/{lessonId}/steps/reorder:
+    post:
+      tags: [AdminLessons]
+      summary: Reorder lesson steps
+      operationId: adminReorderLessonSteps
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReorderLessonStepsRequest'
+      responses:
+        '200':
+          description: Steps reordered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReorderedFlagResponse'
+
+  /admin/lessons/{lessonId}/publish:
+    post:
+      tags: [AdminLessons]
+      summary: Publish or unpublish lesson
+      operationId: adminPublishLesson
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminPublishLessonRequest'
+      responses:
+        '200':
+          description: Lesson publish state updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPublishLessonResponse'
+
+  /admin/words:
+    post:
+      tags: [AdminWords]
+      summary: Create word
+      operationId: adminCreateWord
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateWordRequest'
+      responses:
+        '201':
+          description: Word created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/words/{wordId}:
+    patch:
+      tags: [AdminWords]
+      summary: Update word
+      operationId: adminUpdateWord
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/WordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateWordRequest'
+      responses:
+        '200':
+          description: Word updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedFlagResponse'
+
+  /admin/sentences:
+    post:
+      tags: [AdminSentences]
+      summary: Create sentence
+      operationId: adminCreateSentence
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateSentenceRequest'
+      responses:
+        '201':
+          description: Sentence created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/sounds:
+    post:
+      tags: [AdminSounds]
+      summary: Create sound
+      operationId: adminCreateSound
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateSoundRequest'
+      responses:
+        '201':
+          description: Sound created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/dialogues:
+    post:
+      tags: [AdminDialogues]
+      summary: Create dialogue
+      operationId: adminCreateDialogue
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateDialogueRequest'
+      responses:
+        '201':
+          description: Dialogue created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/dialogues/{dialogueId}/turns:
+    post:
+      tags: [AdminDialogues]
+      summary: Add dialogue turn
+      operationId: adminAddDialogueTurn
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DialogueId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAddDialogueTurnRequest'
+      responses:
+        '201':
+          description: Dialogue turn created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEntityResponse'
+
+  /admin/assets:
+    post:
+      tags: [AdminAssets]
+      summary: Register asset metadata
+      operationId: adminCreateAsset
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateAssetRequest'
+      responses:
+        '201':
+          description: Asset registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateAssetResponse'
+
+  /admin/content-qa:
+    get:
+      tags: [AdminQA]
+      summary: Get content QA issues
+      operationId: adminGetContentQa
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IssueType'
+      responses:
+        '200':
+          description: QA issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminContentQaResponse'
+
+  /admin/analytics/summary:
+    get:
+      tags: [AdminAnalytics]
+      summary: Get admin analytics summary
+      operationId: adminGetAnalyticsSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+      responses:
+        '200':
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAnalyticsSummaryResponse'
+
+
+webhooks:
+  lessonCompleted:
+    post:
+      tags: [Analytics]
+      summary: Lesson completed event webhook
+      operationId: lessonCompletedWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LessonCompletedEvent'
+            examples:
+              default:
+                $ref: '#/components/examples/LessonCompletedEventExample'
+      responses:
+        '200':
+          description: Webhook accepted
+  pronunciationScored:
+    post:
+      tags: [Analytics]
+      summary: Pronunciation scored event webhook
+      operationId: pronunciationScoredWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PronunciationScoredEvent'
+            examples:
+              default:
+                $ref: '#/components/examples/PronunciationScoredEventExample'
+      responses:
+        '200':
+          description: Webhook accepted
+  reviewDue:
+    post:
+      tags: [Notifications]
+      summary: Review due notification event webhook
+      operationId: reviewDueWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDueEvent'
+            examples:
+              default:
+                $ref: '#/components/examples/ReviewDueEventExample'
+      responses:
+        '200':
+          description: Webhook accepted
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CourseId:
+      name: courseId
+      in: path
+      required: true
+      schema: { type: string }
+    UnitId:
+      name: unitId
+      in: path
+      required: true
+      schema: { type: string }
+    UnitIdQuery:
+      name: unit_id
+      in: query
+      required: false
+      schema: { type: string }
+    LessonId:
+      name: lessonId
+      in: path
+      required: true
+      schema: { type: string }
+    LessonIdQuery:
+      name: lesson_id
+      in: query
+      required: false
+      schema: { type: string }
+    StepId:
+      name: stepId
+      in: path
+      required: true
+      schema: { type: string }
+    WordId:
+      name: wordId
+      in: path
+      required: true
+      schema: { type: string }
+    SentenceId:
+      name: sentenceId
+      in: path
+      required: true
+      schema: { type: string }
+    SoundId:
+      name: soundId
+      in: path
+      required: true
+      schema: { type: string }
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: { type: string }
+    DialogueId:
+      name: dialogueId
+      in: path
+      required: true
+      schema: { type: string }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string }
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema: { type: string }
+    WeekId:
+      name: weekId
+      in: path
+      required: true
+      schema: { type: string }
+    PackId:
+      name: packId
+      in: path
+      required: true
+      schema: { type: string }
+    SourceLanguage:
+      name: source_language
+      in: query
+      schema:
+        type: string
+        enum: [th, en]
+    TargetLanguage:
+      name: target_language
+      in: query
+      schema:
+        type: string
+        enum: [en, th]
+    Published:
+      name: published
+      in: query
+      schema:
+        type: boolean
+    Category:
+      name: category
+      in: query
+      schema:
+        type: string
+    Difficulty:
+      name: difficulty
+      in: query
+      schema:
+        type: string
+        enum: [beginner, intermediate, advanced]
+    SearchQuery:
+      name: search
+      in: query
+      schema:
+        type: string
+    SearchQueryRequired:
+      name: q
+      in: query
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    SearchTypes:
+      name: types
+      in: query
+      schema:
+        type: string
+        description: Comma-separated types
+        example: word,sentence,dialogue
+    Favorites:
+      name: favorites
+      in: query
+      schema:
+        type: boolean
+    ThaiDifficulty:
+      name: thai_difficulty
+      in: query
+      schema:
+        type: boolean
+    Context:
+      name: context
+      in: query
+      schema:
+        type: string
+    LevelIdQuery:
+      name: level_id
+      in: query
+      schema:
+        type: string
+    DialogueMode:
+      name: mode
+      in: query
+      schema:
+        $ref: '#/components/schemas/DialogueMode'
+    ReviewMode:
+      name: mode
+      in: query
+      schema:
+        type: string
+        enum: [quick_review, hard_words, weak_sounds, sentence_review, weekly_review]
+    ContentType:
+      name: content_type
+      in: query
+      schema:
+        $ref: '#/components/schemas/ReviewContentType'
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    IssueType:
+      name: issue_type
+      in: query
+      schema:
+        type: string
+    StartDate:
+      name: start_date
+      in: query
+      schema:
+        type: string
+        format: date
+    EndDate:
+      name: end_date
+      in: query
+      schema:
+        type: string
+        format: date
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ForbiddenError:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFoundError:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ConflictError:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    SpeechProcessingError:
+      description: Speech processing failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    DialogueValidationError:
+      description: Dialogue response invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+
+  examples:
+    AuthResponseExample:
+      value:
+        data:
+          user:
+            id: user_001
+            email: user@example.com
+            display_name: Mali
+            native_language: th
+            interface_language: th
+            learning_goal: daily_life
+            current_level_id: level_0
+            current_lesson_id: lesson_001
+            is_guest: false
+            created_at: '2026-04-07T09:30:00Z'
+          access_token: jwt_access_token
+          refresh_token: jwt_refresh_token
+          expires_in: 3600
+        meta: {}
+        error: null
+
+    GetHomeResponseExample:
+      value:
+        data:
+          greeting_name: Mali
+          today_lesson:
+            id: lesson_009
+            title: Water and Yes
+            estimated_minutes: 12
+            progress_percent: 0
+            cta: start
+          review_due:
+            word_count: 8
+            sound_count: 2
+            sentence_count: 3
+          recommended_practice:
+            type: sound
+            target_id: sound_w
+            title: Practice W sound
+          recent_words:
+            - id: word_water
+              english_text: water
+              thai_text: น้ำ
+          summary:
+            lessons_completed: 8
+            words_learned: 41
+            streak_days: 6
+        meta: {}
+        error: null
+
+    GetLessonResponseExample:
+      value:
+        data:
+          id: lesson_009
+          title: Water and Yes
+          subtitle: Practice W sound
+          estimated_minutes: 12
+          lesson_type: standard
+          sound_focus:
+            id: sound_w
+            label: W
+            description_th: เสียงว
+          target_words:
+            - id: word_water
+              english_text: water
+              thai_text: น้ำ
+            - id: word_yes
+              english_text: yes
+              thai_text: ใช่
+          target_sentences:
+            - id: sentence_i_want_water
+              english_text: I want water.
+              thai_text: ฉันต้องการน้ำ
+        meta: {}
+        error: null
+
+    GetLessonStepsResponseExample:
+      value:
+        data:
+          - id: step_001
+            step_order: 1
+            step_type: audio_listen
+            instruction_th: ฟังเสียง
+            payload:
+              sound_id: sound_w
+              audio_asset_url: https://cdn.yourapp.com/audio/w_normal.mp3
+            passing_rule:
+              auto_pass_after_play: true
+          - id: step_002
+            step_order: 2
+            step_type: syllable_drill
+            instruction_th: พูดตามพยางค์
+            payload:
+              syllables:
+                - wa
+                - we
+                - wo
+            passing_rule:
+              min_attempts: 1
+        meta: {}
+        error: null
+
+    GetWordResponseExample:
+      value:
+        data:
+          id: word_water
+          english_text: water
+          thai_text: น้ำ
+          pronunciation_hint: WAW-ter
+          ipa: ˈwɔː.tər
+          syllable_split: [wa, ter]
+          category: drink
+          audio_normal_url: https://cdn.yourapp.com/audio/water_normal.mp3
+          audio_slow_url: https://cdn.yourapp.com/audio/water_slow.mp3
+          image_url: https://cdn.yourapp.com/images/water.png
+          example_sentence:
+            id: sentence_i_want_water
+            english_text: I want water.
+            thai_text: ฉันต้องการน้ำ
+        meta: {}
+        error: null
+
+    GetSentenceResponseExample:
+      value:
+        data:
+          id: sentence_i_want_water
+          english_text: I want water.
+          thai_text: ฉันต้องการน้ำ
+          pronunciation_hint: ai want WAW-ter
+          audio_normal_url: https://cdn.yourapp.com/audio/i_want_water_normal.mp3
+          audio_slow_url: https://cdn.yourapp.com/audio/i_want_water_slow.mp3
+          sentence_pattern:
+            id: pattern_i_want_blank
+            pattern_text: I want ___.
+            pattern_text_th: ฉันต้องการ___
+            difficulty_level: beginner
+          target_words: [word_water]
+        meta: {}
+        error: null
+
+    GetSoundResponseExample:
+      value:
+        data:
+          id: sound_w
+          sound_code: w
+          display_symbol: W
+          title: W sound
+          description_th: เสียง ว
+          mouth_hint: เริ่มด้วยริมฝีปากกลมเล็กน้อย
+          category: consonant
+          thai_difficulty_flag: true
+          audio_demo_normal_url: https://cdn.yourapp.com/audio/sound_w_normal.mp3
+          audio_demo_slow_url: https://cdn.yourapp.com/audio/sound_w_slow.mp3
+          example_words:
+            - id: word_water
+              english_text: water
+              thai_text: น้ำ
+        meta: {}
+        error: null
+
+    GetReviewQueueResponseExample:
+      value:
+        data:
+          - review_id: rq_001
+            content_type: word
+            content_id: word_water
+            reason: due_review
+            priority: 10
+            exercise_type: audio_to_meaning
+          - review_id: rq_002
+            content_type: sound
+            content_id: sound_r
+            reason: low_accuracy
+            priority: 9
+            exercise_type: minimal_pair
+        meta:
+          next_cursor: cursor_002
+          limit: 20
+        error: null
+
+    TranscribeSpeechResponseExample:
+      value:
+        data:
+          transcript_text: I want water
+          confidence: 0.91
+          words:
+            - text: I
+              start_ms: 0
+              end_ms: 120
+            - text: want
+              start_ms: 130
+              end_ms: 420
+            - text: water
+              start_ms: 430
+              end_ms: 900
+        meta: {}
+        error: null
+
+    ScoreWordPronunciationResponseExample:
+      value:
+        data:
+          overall_score: 71
+          phoneme_score: 68
+          stress_score: 74
+          final_sound_score: 80
+          feedback:
+            - code: STRESS_FIRST_SYLLABLE
+              message: Stress the first part: WA-ter.
+          phoneme_feedback:
+            - part: wa
+              score: 76
+            - part: ter
+              score: 63
+        meta: {}
+        error: null
+
+    StartDialogueSessionResponseExample:
+      value:
+        data:
+          dialogue_session_id: ds_001
+          current_turn_id: turn_001
+          status: in_progress
+        meta: {}
+        error: null
+
+    RespondDialogueSessionResponseExample:
+      value:
+        data:
+          accepted: true
+          score: 88
+          feedback: Good job.
+          next_turn:
+            turn_id: turn_003
+            speaker: app
+            text: Here you are.
+            thai_text: นี่ค่ะ/ครับ
+            audio_url: https://cdn.yourapp.com/audio/dialogues/here_you_are.mp3
+        meta: {}
+        error: null
+
+    AdminCreateLessonRequestExample:
+      value:
+        unit_id: unit_week_2
+        lesson_order: 9
+        title: Water and Yes
+        subtitle: Practice W sound
+        estimated_minutes: 12
+        lesson_type: standard
+        sound_focus_id: sound_w
+
+    LessonCompletedEventExample:
+      value:
+        event_id: evt_001
+        event_type: lesson.completed
+        occurred_at: '2026-04-07T09:48:00Z'
+        user_id: user_001
+        lesson_id: lesson_009
+        score:
+          overall: 81
+          pronunciation: 74
+          comprehension: 89
+
+    PronunciationScoredEventExample:
+      value:
+        event_id: evt_002
+        event_type: pronunciation.scored
+        occurred_at: '2026-04-07T09:41:00Z'
+        user_id: user_001
+        content_type: word
+        content_id: word_water
+        attempt_id: attempt_001
+        overall_score: 71
+        feedback_codes:
+          - STRESS_FIRST_SYLLABLE
+
+    ReviewDueEventExample:
+      value:
+        event_id: evt_003
+        event_type: review.due
+        occurred_at: '2026-04-08T09:00:00Z'
+        user_id: user_001
+        due_counts:
+          words: 8
+          sounds: 2
+          sentences: 3
+          dialogues: 1
+
+  schemas:
+    EnvelopeMeta:
+      type: object
+      additionalProperties: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        limit:
+          type: integer
+      required: [next_cursor]
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        issue:
+          type: string
+      required: [field, issue]
+
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+      required: [code, message, details]
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        data:
+          type: 'null'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+      required: [data, meta, error]
+
+    SavedFlagData:
+      type: object
+      properties:
+        saved:
+          type: boolean
+      required: [saved]
+
+    SavedFlagResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/SavedFlagData'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpdatedFlagData:
+      type: object
+      properties:
+        updated:
+          type: boolean
+      required: [updated]
+
+    UpdatedFlagResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/UpdatedFlagData'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    RegisteredFlagResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            registered:
+              type: boolean
+          required: [registered]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ReorderedFlagResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            reordered:
+              type: boolean
+          required: [reordered]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    InterfaceLanguage:
+      type: string
+      enum: [th, en, bilingual]
+
+    VoiceSpeed:
+      type: string
+      enum: [slow, normal]
+
+    LearningGoal:
+      type: string
+      enum: [daily_life, home_conversation, travel, start_from_zero]
+
+    DifficultyLevel:
+      type: string
+      enum: [beginner, intermediate, advanced]
+
+    LessonType:
+      type: string
+      enum: [standard, review, sound_focus, dialogue_focus]
+
+    StepType:
+      type: string
+      enum:
+        - audio_listen
+        - audio_repeat
+        - syllable_drill
+        - word_flashcard
+        - image_match
+        - listen_choose
+        - speak_word
+        - speak_sentence
+        - speak_answer
+        - dialogue_turn
+        - review_quiz
+
+    DialogueMode:
+      type: string
+      enum: [guided, repeat, open]
+
+    ReviewContentType:
+      type: string
+      enum: [word, sound, sentence, dialogue]
+
+    ReviewResult:
+      type: string
+      enum: [correct, incorrect, partial, skipped]
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email:
+          type: string
+          format: email
+          nullable: true
+        display_name: { type: string }
+        native_language:
+          type: string
+          nullable: true
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+        learning_goal:
+          $ref: '#/components/schemas/LearningGoal'
+        current_level_id:
+          type: string
+          nullable: true
+        current_lesson_id:
+          type: string
+          nullable: true
+        is_guest: { type: boolean }
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - display_name
+        - interface_language
+        - is_guest
+        - created_at
+
+    AuthTokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer }
+      required: [access_token, refresh_token, expires_in]
+
+    CreateGuestSessionRequest:
+      type: object
+      properties:
+        device_id: { type: string }
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+        app_version: { type: string }
+      required: [device_id, interface_language, app_version]
+
+    SignupRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        display_name:
+          type: string
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+      required: [email, password, display_name, interface_language]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refresh_token: { type: string }
+      required: [refresh_token]
+
+    UpgradeGuestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+      required: [email, password]
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+      required: [refresh_token]
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_in:
+              type: integer
+          required: [user, access_token, refresh_token, expires_in]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthTokens'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpgradeGuestResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+          required: [user]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    LogoutResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            logged_out:
+              type: boolean
+          required: [logged_out]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpdateMeRequest:
+      type: object
+      properties:
+        display_name: { type: string }
+        learning_goal:
+          $ref: '#/components/schemas/LearningGoal'
+        native_language:
+          type: string
+
+    GetMeResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    Settings:
+      type: object
+      properties:
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+        thai_translation_enabled:
+          type: boolean
+        bilingual_mode:
+          type: boolean
+        preferred_voice_gender:
+          type: string
+          enum: [male, female]
+        audio_speed_default:
+          $ref: '#/components/schemas/VoiceSpeed'
+        subtitles_enabled:
+          type: boolean
+        notifications_enabled:
+          type: boolean
+        daily_reminder_time:
+          type: string
+          nullable: true
+        save_recordings:
+          type: boolean
+        strict_answer_mode:
+          type: boolean
+      required:
+        - interface_language
+        - thai_translation_enabled
+        - bilingual_mode
+        - preferred_voice_gender
+        - audio_speed_default
+        - subtitles_enabled
+        - notifications_enabled
+        - save_recordings
+        - strict_answer_mode
+
+    GetSettingsResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Settings'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+        thai_translation_enabled:
+          type: boolean
+        bilingual_mode:
+          type: boolean
+        preferred_voice_gender:
+          type: string
+          enum: [male, female]
+        audio_speed_default:
+          $ref: '#/components/schemas/VoiceSpeed'
+        subtitles_enabled:
+          type: boolean
+        notifications_enabled:
+          type: boolean
+        daily_reminder_time:
+          type: string
+          nullable: true
+        save_recordings:
+          type: boolean
+        strict_answer_mode:
+          type: boolean
+
+    DeleteRecordingsRequest:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [all]
+      required: [scope]
+
+    DeleteRecordingsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted_count:
+              type: integer
+          required: [deleted_count]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    StartOnboardingRequest:
+      type: object
+      properties:
+        interface_language:
+          $ref: '#/components/schemas/InterfaceLanguage'
+        learning_goal:
+          $ref: '#/components/schemas/LearningGoal'
+      required: [interface_language, learning_goal]
+
+    StartOnboardingResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            onboarding_session_id:
+              type: string
+            recommended_flow:
+              type: array
+              items:
+                type: string
+          required: [onboarding_session_id, recommended_flow]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    OnboardingProfileRequest:
+      type: object
+      properties:
+        onboarding_session_id:
+          type: string
+        display_name:
+          type: string
+        native_language:
+          type: string
+        learning_goal:
+          $ref: '#/components/schemas/LearningGoal'
+        pace:
+          $ref: '#/components/schemas/VoiceSpeed'
+      required: [onboarding_session_id, display_name, native_language, learning_goal, pace]
+
+    PlacementAnswer:
+      oneOf:
+        - type: object
+          properties:
+            type:
+              const: choice
+            value:
+              type: string
+          required: [type, value]
+        - type: object
+          properties:
+            type:
+              const: text
+            value:
+              type: string
+          required: [type, value]
+
+    PlacementAnswerRequest:
+      type: object
+      properties:
+        onboarding_session_id:
+          type: string
+        question_id:
+          type: string
+        answer:
+          $ref: '#/components/schemas/PlacementAnswer'
+      required: [onboarding_session_id, question_id, answer]
+
+    PlacementAnswerResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accepted:
+              type: boolean
+            next_question_id:
+              type: string
+              nullable: true
+          required: [accepted, next_question_id]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CompleteOnboardingRequest:
+      type: object
+      properties:
+        onboarding_session_id:
+          type: string
+      required: [onboarding_session_id]
+
+    CompleteOnboardingResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            recommended_level_id:
+              type: string
+            recommended_lesson_id:
+              type: string
+            summary:
+              type: object
+              additionalProperties: true
+          required: [recommended_level_id, recommended_lesson_id, summary]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CourseSummary:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        source_language: { type: string }
+        target_language: { type: string }
+        version: { type: integer }
+        is_published: { type: boolean }
+      required: [id, title, description, source_language, target_language, version, is_published]
+
+    LevelSummary:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+      required: [id, title]
+
+    CourseMapLesson:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        lesson_order: { type: integer }
+        is_locked: { type: boolean }
+        is_completed: { type: boolean }
+      required: [id, title, lesson_order, is_locked, is_completed]
+
+    CourseMapUnit:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        lessons:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseMapLesson'
+      required: [id, title, lessons]
+
+    CourseMapModule:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseMapUnit'
+      required: [id, title, units]
+
+    CourseMapLevel:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseMapModule'
+      required: [id, title, modules]
+
+    ListCoursesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSummary'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetCourseResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/CourseSummary'
+            - type: object
+              properties:
+                levels:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LevelSummary'
+              required: [levels]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetCourseMapResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            course_id:
+              type: string
+            levels:
+              type: array
+              items:
+                $ref: '#/components/schemas/CourseMapLevel'
+          required: [course_id, levels]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    SoundRef:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        description_th:
+          type: string
+          nullable: true
+      required: [id, label]
+
+    LessonSummary:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        estimated_minutes: { type: integer }
+        sound_focus:
+          $ref: '#/components/schemas/SoundRef'
+        is_completed: { type: boolean }
+        is_locked: { type: boolean }
+      required: [id, title, estimated_minutes, sound_focus, is_completed, is_locked]
+
+    ListLessonsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonSummary'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    WordRef:
+      type: object
+      properties:
+        id: { type: string }
+        english_text: { type: string }
+        thai_text: { type: string }
+      required: [id, english_text, thai_text]
+
+    SentenceRef:
+      type: object
+      properties:
+        id: { type: string }
+        english_text: { type: string }
+        thai_text: { type: string }
+      required: [id, english_text, thai_text]
+
+    LessonDetail:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        subtitle:
+          type: string
+          nullable: true
+        estimated_minutes: { type: integer }
+        lesson_type:
+          $ref: '#/components/schemas/LessonType'
+        sound_focus:
+          $ref: '#/components/schemas/SoundRef'
+        target_words:
+          type: array
+          items:
+            $ref: '#/components/schemas/WordRef'
+        target_sentences:
+          type: array
+          items:
+            $ref: '#/components/schemas/SentenceRef'
+      required:
+        - id
+        - title
+        - estimated_minutes
+        - lesson_type
+        - sound_focus
+        - target_words
+        - target_sentences
+
+    GetLessonResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LessonDetail'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    StepPayload:
+      type: object
+      additionalProperties: true
+
+    PassingRule:
+      type: object
+      additionalProperties: true
+
+    LessonStep:
+      type: object
+      properties:
+        id: { type: string }
+        step_order: { type: integer }
+        step_type:
+          $ref: '#/components/schemas/StepType'
+        instruction_th:
+          type: string
+        payload:
+          $ref: '#/components/schemas/StepPayload'
+        passing_rule:
+          $ref: '#/components/schemas/PassingRule'
+      required: [id, step_order, step_type, instruction_th, payload, passing_rule]
+
+    GetLessonStepsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LessonStep'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    StartLessonRequest:
+      type: object
+      properties:
+        source:
+          type: string
+      required: [source]
+
+    StartLessonResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            lesson_progress_id:
+              type: string
+            status:
+              type: string
+            started_at:
+              type: string
+              format: date-time
+          required: [lesson_progress_id, status, started_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    SaveLessonStepProgressRequest:
+      type: object
+      properties:
+        status:
+          type: string
+        attempts:
+          type: integer
+        time_spent_seconds:
+          type: integer
+        score:
+          type: object
+          additionalProperties:
+            type: number
+        response_summary:
+          type: object
+          additionalProperties: true
+      required: [status, attempts, time_spent_seconds]
+
+    SaveLessonStepProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            saved:
+              type: boolean
+            lesson_completion_percent:
+              type: integer
+          required: [saved, lesson_completion_percent]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetLessonProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            lesson_id:
+              type: string
+            status:
+              type: string
+            current_step_id:
+              type: string
+              nullable: true
+            completion_percent:
+              type: integer
+            retry_count:
+              type: integer
+            time_spent_seconds:
+              type: integer
+          required:
+            - lesson_id
+            - status
+            - completion_percent
+            - retry_count
+            - time_spent_seconds
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ScoreBundle:
+      type: object
+      properties:
+        overall:
+          type: number
+        pronunciation:
+          type: number
+        comprehension:
+          type: number
+      required: [overall]
+
+    CompleteLessonRequest:
+      type: object
+      properties:
+        final_score:
+          $ref: '#/components/schemas/ScoreBundle'
+      required: [final_score]
+
+    RecommendationItem:
+      type: object
+      properties:
+        type:
+          type: string
+        target_id:
+          type: string
+        title:
+          type: string
+      required: [type, target_id, title]
+
+    AchievementItem:
+      type: object
+      properties:
+        code:
+          type: string
+        title:
+          type: string
+      required: [code, title]
+
+    CompleteLessonResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            lesson_id:
+              type: string
+            status:
+              type: string
+            completed_at:
+              type: string
+              format: date-time
+            awards:
+              type: array
+              items:
+                $ref: '#/components/schemas/AchievementItem'
+            recommended_next_actions:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecommendationItem'
+          required: [lesson_id, status, completed_at, awards, recommended_next_actions]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    Word:
+      type: object
+      properties:
+        id: { type: string }
+        english_text: { type: string }
+        thai_text: { type: string }
+        pronunciation_hint:
+          type: string
+          nullable: true
+        ipa:
+          type: string
+          nullable: true
+        syllable_split:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        audio_normal_url:
+          type: string
+          format: uri
+        audio_slow_url:
+          type: string
+          format: uri
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        example_sentence:
+          $ref: '#/components/schemas/SentenceRef'
+      required:
+        - id
+        - english_text
+        - thai_text
+        - syllable_split
+        - category
+        - audio_normal_url
+        - audio_slow_url
+
+    GetWordResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Word'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    WordListItem:
+      allOf:
+        - $ref: '#/components/schemas/WordRef'
+        - type: object
+          properties:
+            category:
+              type: string
+            mastery_status:
+              type: string
+          required: [category, mastery_status]
+
+    ListWordsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WordListItem'
+        meta:
+          allOf:
+            - $ref: '#/components/schemas/EnvelopeMeta'
+            - type: object
+              properties:
+                pagination:
+                  $ref: '#/components/schemas/PaginationMeta'
+              required: [pagination]
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    WordProgress:
+      type: object
+      properties:
+        word_id: { type: string }
+        familiarity_score: { type: number }
+        pronunciation_score: { type: number }
+        listening_score: { type: number }
+        speaking_score: { type: number }
+        times_seen: { type: integer }
+        times_correct: { type: integer }
+        times_incorrect: { type: integer }
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_review_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_hard_word: { type: boolean }
+      required:
+        - word_id
+        - familiarity_score
+        - pronunciation_score
+        - listening_score
+        - speaking_score
+        - times_seen
+        - times_correct
+        - times_incorrect
+        - is_hard_word
+
+    GetWordProgressResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WordProgress'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpdateWordProgressRequest:
+      type: object
+      properties:
+        event_type:
+          type: string
+        result:
+          $ref: '#/components/schemas/ReviewResult'
+        speaking_score:
+          type: number
+        listening_score:
+          type: number
+        mark_hard:
+          type: boolean
+      required: [event_type, result]
+
+    UpdateWordProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            updated:
+              type: boolean
+            next_review_at:
+              type: string
+              format: date-time
+              nullable: true
+          required: [updated, next_review_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ToggleFavoriteRequest:
+      type: object
+      properties:
+        favorite:
+          type: boolean
+      required: [favorite]
+
+    ToggleFavoriteResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            word_id:
+              type: string
+            favorite:
+              type: boolean
+          required: [word_id, favorite]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    SentencePattern:
+      type: object
+      properties:
+        id: { type: string }
+        pattern_text: { type: string }
+        pattern_text_th: { type: string }
+        difficulty_level:
+          $ref: '#/components/schemas/DifficultyLevel'
+      required: [id, pattern_text, pattern_text_th, difficulty_level]
+
+    Sentence:
+      type: object
+      properties:
+        id: { type: string }
+        english_text: { type: string }
+        thai_text: { type: string }
+        pronunciation_hint:
+          type: string
+          nullable: true
+        audio_normal_url:
+          type: string
+          format: uri
+        audio_slow_url:
+          type: string
+          format: uri
+        sentence_pattern:
+          $ref: '#/components/schemas/SentencePattern'
+        target_words:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - english_text
+        - thai_text
+        - audio_normal_url
+        - audio_slow_url
+        - sentence_pattern
+        - target_words
+
+    GetSentenceResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Sentence'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetSentenceProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            sentence_id:
+              type: string
+            familiarity_score:
+              type: number
+            speaking_score:
+              type: number
+            times_practiced:
+              type: integer
+            next_review_at:
+              type: string
+              format: date-time
+              nullable: true
+          required: [sentence_id, familiarity_score, speaking_score, times_practiced, next_review_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ListSentencePatternsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SentencePattern'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    Sound:
+      type: object
+      properties:
+        id: { type: string }
+        sound_code: { type: string }
+        display_symbol: { type: string }
+        title: { type: string }
+        description_th:
+          type: string
+        mouth_hint:
+          type: string
+          nullable: true
+        category:
+          type: string
+        thai_difficulty_flag:
+          type: boolean
+        audio_demo_normal_url:
+          type: string
+          format: uri
+        audio_demo_slow_url:
+          type: string
+          format: uri
+        example_words:
+          type: array
+          items:
+            $ref: '#/components/schemas/WordRef'
+      required:
+        - id
+        - sound_code
+        - display_symbol
+        - title
+        - description_th
+        - category
+        - thai_difficulty_flag
+        - audio_demo_normal_url
+        - audio_demo_slow_url
+        - example_words
+
+    SoundListItem:
+      type: object
+      properties:
+        id: { type: string }
+        display_symbol: { type: string }
+        title: { type: string }
+        thai_difficulty_flag: { type: boolean }
+      required: [id, display_symbol, title, thai_difficulty_flag]
+
+    ListSoundsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoundListItem'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetSoundResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Sound'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetSoundProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            sound_id:
+              type: string
+            accuracy_score:
+              type: number
+            attempts_count:
+              type: integer
+            last_practiced_at:
+              type: string
+              format: date-time
+              nullable: true
+            next_review_at:
+              type: string
+              format: date-time
+              nullable: true
+            difficulty_flag:
+              type: boolean
+          required:
+            - sound_id
+            - accuracy_score
+            - attempts_count
+            - last_practiced_at
+            - next_review_at
+            - difficulty_flag
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    UpdateSoundProgressRequest:
+      type: object
+      properties:
+        attempts_count_delta:
+          type: integer
+        accuracy_score:
+          type: number
+        difficulty_flag:
+          type: boolean
+      required: [attempts_count_delta, accuracy_score, difficulty_flag]
+
+    MinimalPairItem:
+      type: object
+      properties:
+        id: { type: string }
+        word_a:
+          $ref: '#/components/schemas/WordRef'
+        word_b:
+          $ref: '#/components/schemas/WordRef'
+      required: [id, word_a, word_b]
+
+    GetMinimalPairGroupResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            sound_a:
+              $ref: '#/components/schemas/SoundRef'
+            sound_b:
+              $ref: '#/components/schemas/SoundRef'
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MinimalPairItem'
+          required: [id, title, sound_a, sound_b, items]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetHomeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            greeting_name:
+              type: string
+            today_lesson:
+              type: object
+              properties:
+                id: { type: string }
+                title: { type: string }
+                estimated_minutes: { type: integer }
+                progress_percent: { type: integer }
+                cta: { type: string }
+              required: [id, title, estimated_minutes, progress_percent, cta]
+            review_due:
+              type: object
+              properties:
+                word_count: { type: integer }
+                sound_count: { type: integer }
+                sentence_count: { type: integer }
+              required: [word_count, sound_count, sentence_count]
+            recommended_practice:
+              $ref: '#/components/schemas/RecommendationItem'
+            recent_words:
+              type: array
+              items:
+                $ref: '#/components/schemas/WordRef'
+            summary:
+              type: object
+              properties:
+                lessons_completed: { type: integer }
+                words_learned: { type: integer }
+                streak_days: { type: integer }
+              required: [lessons_completed, words_learned, streak_days]
+          required: [greeting_name, today_lesson, review_due, recommended_practice, recent_words, summary]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    PronunciationTrendItem:
+      type: object
+      properties:
+        week:
+          type: integer
+        score:
+          type: number
+      required: [week, score]
+
+    WeakSoundItem:
+      type: object
+      properties:
+        sound_id:
+          type: string
+        label:
+          type: string
+        accuracy_score:
+          type: number
+      required: [sound_id, label, accuracy_score]
+
+    GetProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            course_completion_percent: { type: integer }
+            lessons_completed: { type: integer }
+            words_learned: { type: integer }
+            dialogues_completed: { type: integer }
+            streak_days: { type: integer }
+            pronunciation_trend:
+              type: array
+              items:
+                $ref: '#/components/schemas/PronunciationTrendItem'
+            weak_sounds:
+              type: array
+              items:
+                $ref: '#/components/schemas/WeakSoundItem'
+            achievements:
+              type: array
+              items:
+                $ref: '#/components/schemas/AchievementItem'
+          required:
+            - course_completion_percent
+            - lessons_completed
+            - words_learned
+            - dialogues_completed
+            - streak_days
+            - pronunciation_trend
+            - weak_sounds
+            - achievements
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetReviewSummaryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            due_today:
+              type: object
+              properties:
+                words: { type: integer }
+                sounds: { type: integer }
+                sentences: { type: integer }
+                dialogues: { type: integer }
+              required: [words, sounds, sentences, dialogues]
+            hard_items:
+              type: object
+              properties:
+                words: { type: integer }
+                sounds: { type: integer }
+              required: [words, sounds]
+            recommended_mode:
+              type: string
+          required: [due_today, hard_items, recommended_mode]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ReviewQueueItem:
+      type: object
+      properties:
+        review_id:
+          type: string
+        content_type:
+          $ref: '#/components/schemas/ReviewContentType'
+        content_id:
+          type: string
+        reason:
+          type: string
+        priority:
+          type: integer
+        exercise_type:
+          type: string
+      required: [review_id, content_type, content_id, reason, priority, exercise_type]
+
+    GetReviewQueueResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewQueueItem'
+        meta:
+          allOf:
+            - $ref: '#/components/schemas/EnvelopeMeta'
+            - $ref: '#/components/schemas/PaginationMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CompleteReviewItemRequest:
+      type: object
+      properties:
+        result:
+          $ref: '#/components/schemas/ReviewResult'
+        confidence:
+          type: string
+          enum: [easy, okay, hard]
+        time_spent_seconds:
+          type: integer
+        score:
+          type: number
+      required: [result, confidence, time_spent_seconds]
+
+    CompleteReviewItemResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            completed:
+              type: boolean
+            next_review_at:
+              type: string
+              format: date-time
+              nullable: true
+          required: [completed, next_review_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    GetWeeklyReviewResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            week_id:
+              type: string
+            words_learned:
+              type: integer
+            sounds_practiced:
+              type: integer
+            sentence_patterns:
+              type: integer
+            weak_areas:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecommendationItem'
+          required: [week_id, words_learned, sounds_practiced, sentence_patterns, weak_areas]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CompleteWeeklyReviewRequest:
+      type: object
+      properties:
+        score_overall:
+          type: number
+        pronunciation_score:
+          type: number
+        comprehension_score:
+          type: number
+      required: [score_overall]
+
+    CompleteWeeklyReviewResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            completed:
+              type: boolean
+            recommendations:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecommendationItem'
+          required: [completed, recommendations]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CreateSpeechUploadRequest:
+      type: object
+      properties:
+        content_type:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required: [content_type, context]
+
+    CreateSpeechUploadResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            upload_id:
+              type: string
+            upload_url:
+              type: string
+              format: uri
+            asset_url:
+              type: string
+              format: uri
+            expires_at:
+              type: string
+              format: date-time
+          required: [upload_id, upload_url, asset_url, expires_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    TranscribeSpeechRequest:
+      type: object
+      properties:
+        audio_asset_url:
+          type: string
+          format: uri
+        language:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+      required: [audio_asset_url, language, context]
+
+    TranscriptWord:
+      type: object
+      properties:
+        text:
+          type: string
+        start_ms:
+          type: integer
+        end_ms:
+          type: integer
+      required: [text, start_ms, end_ms]
+
+    TranscribeSpeechResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            transcript_text:
+              type: string
+            confidence:
+              type: number
+            words:
+              type: array
+              items:
+                $ref: '#/components/schemas/TranscriptWord'
+          required: [transcript_text, confidence, words]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ScoreWordPronunciationRequest:
+      type: object
+      properties:
+        audio_asset_url:
+          type: string
+          format: uri
+        target_word_id:
+          type: string
+        target_text:
+          type: string
+      required: [audio_asset_url, target_word_id, target_text]
+
+    FeedbackItem:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]
+
+    PhonemeFeedbackItem:
+      type: object
+      properties:
+        part:
+          type: string
+        score:
+          type: number
+      required: [part, score]
+
+    ScoreWordPronunciationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            overall_score:
+              type: number
+            phoneme_score:
+              type: number
+            stress_score:
+              type: number
+            final_sound_score:
+              type: number
+            feedback:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedbackItem'
+            phoneme_feedback:
+              type: array
+              items:
+                $ref: '#/components/schemas/PhonemeFeedbackItem'
+          required:
+            - overall_score
+            - phoneme_score
+            - stress_score
+            - final_sound_score
+            - feedback
+            - phoneme_feedback
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ScoreSentencePronunciationRequest:
+      type: object
+      properties:
+        audio_asset_url:
+          type: string
+          format: uri
+        target_sentence_id:
+          type: string
+        target_text:
+          type: string
+      required: [audio_asset_url, target_sentence_id, target_text]
+
+    WordScoreItem:
+      type: object
+      properties:
+        word:
+          type: string
+        score:
+          type: number
+      required: [word, score]
+
+    ScoreSentencePronunciationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            overall_score:
+              type: number
+            word_scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/WordScoreItem'
+            stress_score:
+              type: number
+            fluency_score:
+              type: number
+            feedback:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedbackItem'
+          required: [overall_score, word_scores, stress_score, fluency_score, feedback]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ScoreSoundPronunciationRequest:
+      type: object
+      properties:
+        audio_asset_url:
+          type: string
+          format: uri
+        target_sound_id:
+          type: string
+      required: [audio_asset_url, target_sound_id]
+
+    ScoreSoundPronunciationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            overall_score:
+              type: number
+            feedback:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedbackItem'
+          required: [overall_score, feedback]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    SaveSpeechAttemptRequest:
+      type: object
+      properties:
+        lesson_step_id:
+          type: string
+          nullable: true
+        word_id:
+          type: string
+          nullable: true
+        sentence_id:
+          type: string
+          nullable: true
+        dialogue_id:
+          type: string
+          nullable: true
+        audio_asset_url:
+          type: string
+          format: uri
+        transcript_text:
+          type: string
+          nullable: true
+        recognition_confidence:
+          type: number
+          nullable: true
+        pronunciation_score:
+          type: number
+          nullable: true
+        feedback_text:
+          type: string
+          nullable: true
+      required: [audio_asset_url]
+
+    SaveSpeechAttemptResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            attempt_id:
+              type: string
+          required: [attempt_id]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    DialogueListItem:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        context: { type: string }
+        mode:
+          $ref: '#/components/schemas/DialogueMode'
+        turn_count: { type: integer }
+        difficulty:
+          $ref: '#/components/schemas/DifficultyLevel'
+      required: [id, title, context, mode, turn_count, difficulty]
+
+    ListDialoguesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DialogueListItem'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    DialogueDetail:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        context: { type: string }
+        mode:
+          $ref: '#/components/schemas/DialogueMode'
+        target_phrases:
+          type: array
+          items:
+            type: string
+      required: [id, title, description, context, mode, target_phrases]
+
+    GetDialogueResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/DialogueDetail'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    DialogueTurn:
+      type: object
+      properties:
+        turn_id: { type: string }
+        speaker:
+          type: string
+          enum: [app, learner]
+        text:
+          type: string
+          nullable: true
+        thai_text:
+          type: string
+          nullable: true
+        audio_url:
+          type: string
+          format: uri
+          nullable: true
+        expected_answers:
+          type: array
+          items:
+            type: string
+          nullable: true
+        validation_type:
+          type: string
+          nullable: true
+        hint_text:
+          type: string
+          nullable: true
+      required: [turn_id, speaker]
+
+    GetDialogueTurnsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DialogueTurn'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    StartDialogueSessionRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/DialogueMode'
+      required: [mode]
+
+    StartDialogueSessionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            dialogue_session_id:
+              type: string
+            current_turn_id:
+              type: string
+            status:
+              type: string
+          required: [dialogue_session_id, current_turn_id, status]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    RespondDialogueSessionRequest:
+      type: object
+      properties:
+        turn_id:
+          type: string
+        audio_asset_url:
+          type: string
+          format: uri
+          nullable: true
+        transcript_text:
+          type: string
+          nullable: true
+      required: [turn_id]
+
+    RespondDialogueSessionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accepted:
+              type: boolean
+            score:
+              type: number
+              nullable: true
+            feedback:
+              type: string
+            next_turn:
+              $ref: '#/components/schemas/DialogueTurn'
+          required: [accepted, feedback]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    RetryDialogueSessionRequest:
+      type: object
+      properties:
+        turn_id:
+          type: string
+      required: [turn_id]
+
+    RetryDialogueSessionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            retry_allowed:
+              type: boolean
+            hint_text:
+              type: string
+              nullable: true
+            replay_audio_url:
+              type: string
+              format: uri
+              nullable: true
+          required: [retry_allowed, hint_text, replay_audio_url]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    CompleteDialogueSessionRequest:
+      type: object
+      properties:
+        score_overall:
+          type: number
+      required: [score_overall]
+
+    CompleteDialogueSessionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            completed:
+              type: boolean
+            completed_at:
+              type: string
+              format: date-time
+            recommendations:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecommendationItem'
+          required: [completed, completed_at, recommendations]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    SearchResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            words:
+              type: array
+              items:
+                $ref: '#/components/schemas/WordRef'
+            sentences:
+              type: array
+              items:
+                $ref: '#/components/schemas/SentenceRef'
+            dialogues:
+              type: array
+              items:
+                $ref: '#/components/schemas/DialogueListItem'
+          required: [words, sentences, dialogues]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    DownloadPackItem:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        size_mb: { type: number }
+        asset_count: { type: integer }
+        is_downloaded: { type: boolean }
+      required: [id, title, size_mb, asset_count, is_downloaded]
+
+    ListDownloadPacksResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DownloadPackItem'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    DownloadPackFile:
+      type: object
+      properties:
+        asset_id: { type: string }
+        url:
+          type: string
+          format: uri
+        checksum:
+          type: string
+      required: [asset_id, url, checksum]
+
+    GetDownloadPackResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            files:
+              type: array
+              items:
+                $ref: '#/components/schemas/DownloadPackFile'
+          required: [id, title, files]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    ListAchievementsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/AchievementItem'
+              - type: object
+                properties:
+                  unlocked_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                required: [unlocked_at]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    RegisterDeviceTokenRequest:
+      type: object
+      properties:
+        platform:
+          type: string
+          enum: [ios, android]
+        device_token:
+          type: string
+        device_id:
+          type: string
+      required: [platform, device_token, device_id]
+
+    SetReminderPreferencesRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        daily_time:
+          type: string
+        timezone:
+          type: string
+      required: [enabled, daily_time, timezone]
+
+    AnalyticsEvent:
+      type: object
+      properties:
+        event_name:
+          type: string
+        event_time:
+          type: string
+          format: date-time
+        properties:
+          type: object
+          additionalProperties: true
+      required: [event_name, event_time, properties]
+
+    SubmitAnalyticsEventsRequest:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsEvent'
+      required: [events]
+
+    SubmitAnalyticsEventsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accepted:
+              type: integer
+          required: [accepted]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+
+    EventBase:
+      type: object
+      properties:
+        event_id:
+          type: string
+        event_type:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+      required: [event_id, event_type, occurred_at, user_id]
+
+    LessonCompletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          properties:
+            lesson_id:
+              type: string
+            score:
+              $ref: '#/components/schemas/ScoreBundle'
+          required: [lesson_id, score]
+
+    PronunciationScoredEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          properties:
+            content_type:
+              type: string
+              enum: [sound, word, sentence]
+            content_id:
+              type: string
+            attempt_id:
+              type: string
+            overall_score:
+              type: number
+            feedback_codes:
+              type: array
+              items:
+                type: string
+          required: [content_type, content_id, attempt_id, overall_score, feedback_codes]
+
+    ReviewDueEvent:
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          properties:
+            due_counts:
+              type: object
+              properties:
+                words:
+                  type: integer
+                sounds:
+                  type: integer
+                sentences:
+                  type: integer
+                dialogues:
+                  type: integer
+              required: [words, sounds, sentences, dialogues]
+          required: [due_counts]
+
+    AdminLessonListItem:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        unit_id: { type: string }
+        estimated_minutes: { type: integer }
+        is_published: { type: boolean }
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, title, unit_id, estimated_minutes, is_published, updated_at]
+
+    AdminListLessonsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminLessonListItem'
+        meta:
+          allOf:
+            - $ref: '#/components/schemas/EnvelopeMeta'
+            - $ref: '#/components/schemas/PaginationMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    AdminCreateLessonRequest:
+      type: object
+      properties:
+        unit_id:
+          type: string
+        lesson_order:
+          type: integer
+        title:
+          type: string
+        subtitle:
+          type: string
+          nullable: true
+        estimated_minutes:
+          type: integer
+        lesson_type:
+          $ref: '#/components/schemas/LessonType'
+        sound_focus_id:
+          type: string
+          nullable: true
+      required: [unit_id, lesson_order, title, estimated_minutes, lesson_type]
+
+    AdminUpdateLessonRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        subtitle:
+          type: string
+          nullable: true
+        estimated_minutes:
+          type: integer
+        is_published:
+          type: boolean
+
+    AdminAddLessonStepRequest:
+      type: object
+      properties:
+        step_order:
+          type: integer
+        step_type:
+          $ref: '#/components/schemas/StepType'
+        instruction_en:
+          type: string
+        instruction_th:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        passing_rule:
+          type: object
+          additionalProperties: true
+      required: [step_order, step_type, instruction_en, instruction_th, payload, passing_rule]
+
+    AdminReorderLessonStepsRequest:
+      type: object
+      properties:
+        ordered_step_ids:
+          type: array
+          items:
+            type: string
+      required: [ordered_step_ids]
+
+    AdminPublishLessonRequest:
+      type: object
+      properties:
+        publish:
+          type: boolean
+      required: [publish]
+
+    AdminPublishLessonResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            lesson_id:
+              type: string
+            is_published:
+              type: boolean
+          required: [lesson_id, is_published]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    AdminCreateWordRequest:
+      type: object
+      properties:
+        english_text:
+          type: string
+        thai_text:
+          type: string
+        pronunciation_hint:
+          type: string
+          nullable: true
+        ipa:
+          type: string
+          nullable: true
+        syllable_split:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        difficulty_level:
+          $ref: '#/components/schemas/DifficultyLevel'
+        audio_normal_asset_id:
+          type: string
+          nullable: true
+        audio_slow_asset_id:
+          type: string
+          nullable: true
+        image_asset_id:
+          type: string
+          nullable: true
+      required: [english_text, thai_text, syllable_split, category, difficulty_level]
+
+    AdminUpdateWordRequest:
+      type: object
+      properties:
+        english_text:
+          type: string
+        thai_text:
+          type: string
+        pronunciation_hint:
+          type: string
+          nullable: true
+        ipa:
+          type: string
+          nullable: true
+        syllable_split:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        difficulty_level:
+          $ref: '#/components/schemas/DifficultyLevel'
+        audio_normal_asset_id:
+          type: string
+          nullable: true
+        audio_slow_asset_id:
+          type: string
+          nullable: true
+        image_asset_id:
+          type: string
+          nullable: true
+
+    AdminCreateSentenceRequest:
+      type: object
+      properties:
+        english_text:
+          type: string
+        thai_text:
+          type: string
+        pronunciation_hint:
+          type: string
+          nullable: true
+        sentence_pattern_id:
+          type: string
+        difficulty_level:
+          $ref: '#/components/schemas/DifficultyLevel'
+        audio_normal_asset_id:
+          type: string
+          nullable: true
+        audio_slow_asset_id:
+          type: string
+          nullable: true
+      required: [english_text, thai_text, sentence_pattern_id, difficulty_level]
+
+    AdminCreateSoundRequest:
+      type: object
+      properties:
+        sound_code:
+          type: string
+        display_symbol:
+          type: string
+        title:
+          type: string
+        description_th:
+          type: string
+        mouth_hint:
+          type: string
+          nullable: true
+        category:
+          type: string
+        thai_difficulty_flag:
+          type: boolean
+        audio_demo_normal_asset_id:
+          type: string
+          nullable: true
+        audio_demo_slow_asset_id:
+          type: string
+          nullable: true
+      required:
+        - sound_code
+        - display_symbol
+        - title
+        - description_th
+        - category
+        - thai_difficulty_flag
+
+    AdminCreateDialogueRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        context:
+          type: string
+        mode:
+          $ref: '#/components/schemas/DialogueMode'
+        level_id:
+          type: string
+      required: [title, description, context, mode, level_id]
+
+    AdminAddDialogueTurnRequest:
+      type: object
+      properties:
+        turn_order:
+          type: integer
+        speaker:
+          type: string
+          enum: [app, learner]
+        text:
+          type: string
+          nullable: true
+        thai_text:
+          type: string
+          nullable: true
+        audio_asset_id:
+          type: string
+          nullable: true
+        expected_answers:
+          type: array
+          items:
+            type: string
+          nullable: true
+        validation_type:
+          type: string
+          nullable: true
+        hint_text:
+          type: string
+          nullable: true
+      required: [turn_order, speaker]
+
+    AdminCreateAssetRequest:
+      type: object
+      properties:
+        asset_type:
+          type: string
+        url:
+          type: string
+          format: uri
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [asset_type, url]
+
+    AdminCreateAssetResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            asset_id:
+              type: string
+          required: [asset_id]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    AdminCreateEntityResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            created:
+              type: boolean
+          required: [id, created]
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    AdminQaIssue:
+      type: object
+      properties:
+        content_type:
+          type: string
+        content_id:
+          type: string
+        issue_type:
+          type: string
+      required: [content_type, content_id, issue_type]
+
+    AdminContentQaResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminQaIssue'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
+
+    FailureRateItem:
+      type: object
+      properties:
+        sound_id:
+          type: string
+        failure_rate:
+          type: number
+      required: [sound_id, failure_rate]
+
+    AdminAnalyticsSummaryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            daily_active_users:
+              type: integer
+            lesson_completion_rate:
+              type: number
+            avg_pronunciation_score:
+              type: number
+            top_failed_sounds:
+              type: array
+              items:
+                $ref: '#/components/schemas/FailureRateItem'
+          required:
+            - daily_active_users
+            - lesson_completion_rate
+            - avg_pronunciation_score
+            - top_failed_sounds
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          type: 'null'
+      required: [data, meta, error]
