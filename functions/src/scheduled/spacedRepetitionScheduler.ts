@@ -81,11 +81,13 @@ async function processUserReviews(
         efactor: data.sm2Efactor ?? 2.5,
       };
 
-      // Quality 0 = complete blackout (forgotten after long absence)
+      // Quality 0 = complete blackout (forgotten after long absence).
+      // SM-2 resets interval to 1 day for quality < 3, so next.nextIntervalDays
+      // will always be 1 here — use it explicitly for algorithm consistency.
       const next = computeNextSm2(current, 0 as Sm2Quality);
 
       const nextDue = new Date();
-      nextDue.setDate(nextDue.getDate() + 1); // always 1 day for catch-up
+      nextDue.setDate(nextDue.getDate() + next.nextIntervalDays);
 
       batch.update(doc.ref, {
         sm2Interval: next.interval,
