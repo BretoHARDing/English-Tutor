@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { use, useRef, useState, useCallback } from 'react';
 import WaveformVisualizer, {
   WaveformVisualizerHandle,
 } from '../../../components/WaveformVisualizer';
 
 interface LessonDetailPageProps {
-  params: { lessonId: string };
+  params: Promise<{ lessonId: string }>;
 }
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'stopped';
@@ -19,7 +19,7 @@ type RecordingState = 'idle' | 'requesting' | 'recording' | 'stopped';
  * directly in the browser to attach as a reference audio asset.
  */
 export default function LessonDetailPage({ params }: LessonDetailPageProps) {
-  const { lessonId } = params;
+  const { lessonId } = use(params);
   const vizRef = useRef<WaveformVisualizerHandle>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
