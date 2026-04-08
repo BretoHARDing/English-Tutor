@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/feedback_widgets.dart';
+import '../../../../shared/widgets/pronunciation_guide_card.dart';
+import '../../../../shared/widgets/pronunciation_feedback_widget.dart';
 
 // ── Demo data ─────────────────────────────────────────────────────────────
 // In production these come from the getDueReviews Cloud Function callable.
@@ -16,6 +18,7 @@ class _ReviewItem {
     required this.back,
     required this.pronunciation,
     required this.exerciseType,
+    this.soundId,
   });
 
   final String reviewId;
@@ -24,6 +27,9 @@ class _ReviewItem {
   final String back;        // Thai translation
   final String pronunciation; // IPA or phonetic guide
   final String exerciseType;
+
+  /// For contentType == 'sound': maps to a SoundGuideData key
+  final String? soundId;
 }
 
 const _demoItems = <_ReviewItem>[
@@ -66,6 +72,25 @@ const _demoItems = <_ReviewItem>[
     back: 'กรุณา / ได้โปรด',
     pronunciation: '/pliːz/',
     exerciseType: 'word_flashcard',
+  ),
+  // Sound review — shows video guide + microphone practice with precise feedback
+  _ReviewItem(
+    reviewId: 'sound_th_unvoiced',
+    contentType: 'sound',
+    front: 'เสียง TH ไม่ก้อง',
+    back: 'think, three, thank you',
+    pronunciation: '/θ/',
+    exerciseType: 'sound_practice',
+    soundId: 'th_unvoiced',
+  ),
+  _ReviewItem(
+    reviewId: 'sound_v',
+    contentType: 'sound',
+    front: 'เสียง V',
+    back: 'very, video, voice',
+    pronunciation: '/v/',
+    exerciseType: 'sound_practice',
+    soundId: 'v',
   ),
 ];
 
@@ -139,6 +164,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
   String _feedbackMessage = '';
   int _feedbackMessageIndex = 0;
 
+  // Sound practice state
+  bool _soundRecording = false;
+  bool _soundDone = false;
+  int _soundAttempt = 0;
+  PronunciationScores? _soundScores;
+
   // Session stats
   int _hardCount = 0;
   int _goodCount = 0;
@@ -148,6 +179,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   bool get _hasItems => _items.isNotEmpty;
   _ReviewItem? get _current =>
       _hasItems && _currentIndex < _items.length ? _items[_currentIndex] : null;
+  bool get _isSoundItem => _current?.contentType == 'sound';
 
   int get _totalRated => _hardCount + _goodCount + _easyCount;
   int get _correctCount => _goodCount + _easyCount;
@@ -191,12 +223,60 @@ class _ReviewScreenState extends State<ReviewScreen> {
     setState(() {
       _showFeedback = false;
       _isFlipped = false;
+      _advanceItem();
+    });
+  }
 
-      if (_currentIndex < _items.length - 1) {
-        _currentIndex++;
+  void _advanceItem() {
+    if (_currentIndex < _items.length - 1) {
+      _currentIndex++;
+      // Reset sound state for next item
+      _soundRecording = false;
+      _soundDone = false;
+      _soundAttempt = 0;
+      _soundScores = null;
+    } else {
+      _sessionComplete = true;
+    }
+  }
+
+  // ── Sound practice callbacks ──────────────────────────────────────────
+
+  Future<void> _startSoundRecording() async {
+    setState(() {
+      _soundRecording = true;
+      _soundDone = false;
+      _soundScores = null;
+    });
+    // Simulate async scoring — replace with real recording + Cloud Function call
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() {
+      _soundRecording = false;
+      _soundDone = true;
+      _soundAttempt++;
+      _soundScores = PronunciationScores.fromOverall(
+          55 + (_soundAttempt * 10).clamp(0, 40));
+    });
+  }
+
+  void _soundTryAgain() {
+    setState(() {
+      _soundDone = false;
+      _soundScores = null;
+    });
+  }
+
+  void _soundNext() {
+    // Count a good score as "good", anything lower as "hard"
+    final score = _soundScores?.overall ?? 0;
+    setState(() {
+      if (score >= 65) {
+        _goodCount++;
       } else {
-        _sessionComplete = true;
+        _hardCount++;
       }
+      _advanceItem();
     });
   }
 
@@ -237,6 +317,33 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
     final item = _current!;
     final progress = (_currentIndex + 1) / _items.length;
+
+    // Sound items get the video guide + precise feedback experience
+    if (_isSoundItem) {
+      final guide = kSoundGuides[item.soundId] ?? kSoundGuides['th_unvoiced']!;
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('ทบทวนเสียง ${_currentIndex + 1}/${_items.length}'),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+            ),
+          ),
+        ),
+        body: _SoundReviewBody(
+          guide: guide,
+          isRecording: _soundRecording,
+          recordingDone: _soundDone,
+          attemptCount: _soundAttempt,
+          scores: _soundScores,
+          onStart: _startSoundRecording,
+          onTryAgain: _soundTryAgain,
+          onNext: _soundNext,
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -568,6 +675,250 @@ class _RatingButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Sound review body ─────────────────────────────────────────────────────
+// Shown instead of the flashcard when the current review item is a sound.
+// Embeds the pronunciation video guide then the practice + precise feedback.
+
+class _SoundReviewBody extends StatefulWidget {
+  const _SoundReviewBody({
+    required this.guide,
+    required this.isRecording,
+    required this.recordingDone,
+    required this.attemptCount,
+    required this.scores,
+    required this.onStart,
+    required this.onTryAgain,
+    required this.onNext,
+  });
+
+  final SoundGuideData guide;
+  final bool isRecording;
+  final bool recordingDone;
+  final int attemptCount;
+  final PronunciationScores? scores;
+  final VoidCallback onStart;
+  final VoidCallback onTryAgain;
+  final VoidCallback onNext;
+
+  @override
+  State<_SoundReviewBody> createState() => _SoundReviewBodyState();
+}
+
+class _SoundReviewBodyState extends State<_SoundReviewBody>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // Jump straight to practice tab if already attempted
+    if (widget.attemptCount > 0) {
+      _tabController.index = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Tab bar
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.play_circle_outline_rounded), text: 'ดูวิดีโอ'),
+            Tab(icon: Icon(Icons.mic_rounded), text: 'ฝึกพูด'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 0 — Video guide
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: PronunciationGuideCard(
+                  guide: widget.guide,
+                  showPracticeWords: true,
+                ),
+              ),
+              // Tab 1 — Record + feedback
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: widget.recordingDone && widget.scores != null
+                    ? PrecisePronunciationFeedback(
+                        scores: widget.scores!,
+                        soundLabel: widget.guide.thaiName,
+                        attempt: widget.attemptCount,
+                        onTryAgain: widget.onTryAgain,
+                        onNext: widget.onNext,
+                      )
+                    : _SoundPracticePrompt(
+                        guide: widget.guide,
+                        isRecording: widget.isRecording,
+                        attemptCount: widget.attemptCount,
+                        onStart: widget.onStart,
+                        onSkipToGuide: () => _tabController.animateTo(0),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SoundPracticePrompt extends StatelessWidget {
+  const _SoundPracticePrompt({
+    required this.guide,
+    required this.isRecording,
+    required this.attemptCount,
+    required this.onStart,
+    required this.onSkipToGuide,
+  });
+
+  final SoundGuideData guide;
+  final bool isRecording;
+  final int attemptCount;
+  final VoidCallback onStart;
+  final VoidCallback onSkipToGuide;
+
+  @override
+  Widget build(BuildContext context) {
+    final practiceWord = guide.practiceWords.isNotEmpty
+        ? guide.practiceWords[attemptCount % guide.practiceWords.length]
+        : guide.ipaSymbol;
+
+    return Column(
+      children: [
+        // Reminder tip
+        if (attemptCount == 0)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A73E8).withOpacity(0.07),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.ondemand_video_rounded,
+                    color: Color(0xFF1A73E8), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onSkipToGuide,
+                    child: Text(
+                      'ยังไม่แน่ใจ? ดูวิดีโอก่อนได้เลย →',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF1A73E8),
+                            decoration: TextDecoration.underline,
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 24),
+
+        // Word prompt
+        Text('ออกเสียงคำนี้:', style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+          decoration: BoxDecoration(
+            color:
+                Theme.of(context).colorScheme.primary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.25),
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                practiceWord,
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      fontSize: 40,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                guide.ipaSymbol,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: const Color(0xFF5F6368),
+                    ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Mic button
+        GestureDetector(
+          onTap: isRecording ? null : onStart,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isRecording
+                  ? const Color(0xFFEA4335)
+                  : Theme.of(context).colorScheme.primary,
+              boxShadow: [
+                BoxShadow(
+                  color: (isRecording
+                          ? const Color(0xFFEA4335)
+                          : Theme.of(context).colorScheme.primary)
+                      .withOpacity(0.35),
+                  blurRadius: isRecording ? 24 : 12,
+                  spreadRadius: isRecording ? 4 : 0,
+                ),
+              ],
+            ),
+            child: Icon(
+              isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          isRecording
+              ? 'กำลังฟัง… พูดออกมาเลย! 🎙️'
+              : attemptCount == 0
+                  ? 'กดปุ่มไมค์แล้วพูดคำนั้น'
+                  : 'ลองอีกครั้ง — คุณทำได้ดีขึ้นทุกที!',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        if (attemptCount > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'ครั้งที่ $attemptCount แล้ว ไม่ยอมแพ้นะ! 💪',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+          ),
+        ],
+      ],
     );
   }
 }
