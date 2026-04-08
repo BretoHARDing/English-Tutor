@@ -1,3 +1,4 @@
+import { logger } from 'firebase-functions/v2';
 import { db, FieldValue } from '../utils/firestore';
 
 export interface DerivedHomeData {
@@ -7,6 +8,7 @@ export interface DerivedHomeData {
     title: string;
     estimatedMinutes: number;
     progressPercent: number;
+    /** 'start' | 'continue' | 'review' */
     cta: string;
   } | null;
   reviewDue: {
@@ -14,6 +16,7 @@ export interface DerivedHomeData {
     soundCount: number;
     sentenceCount: number;
     dialogueCount: number;
+    total: number;
   };
   recommendedPractice?: {
     type: string;
@@ -30,92 +33,130 @@ export interface DerivedHomeData {
 
 /**
  * Writes the pre-computed home document for a learner.
- * Called from triggers and the rebuildDerivedHome callable.
  */
 export async function writeDerivedHome(
   uid: string,
   data: DerivedHomeData
 ): Promise<void> {
-  await db.doc(`users/${uid}/derived/home`).set(
-    {
-      ...data,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+  try {
+    await db.doc(`users/${uid}/derived/home`).set(
+      { ...data, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  } catch (error) {
+    logger.error('writeDerivedHome failed', { uid, error });
+    throw error;
+  }
 }
 
 /**
- * Computes the full derived home document for a learner by reading
- * their current progress, lesson state, and review queue.
+ * Builds the derived home document.
+ *
+ * Performance notes:
+ * - Reads aggregate counters from the user document (O(1)) instead of
+ *   scanning full subcollections.
+ * - Still reads the review queue for due counts (needed for accuracy).
  */
 export async function buildDerivedHome(uid: string): Promise<DerivedHomeData> {
-  const userDoc = await db.doc(`users/${uid}`).get();
-  const userData = userDoc.data() || {};
+  try {
+    const [userDoc, reviewQueueSnap, soundProgressSnap] = await Promise.all([
+      db.doc(`users/${uid}`).get(),
+      // Due review items only — filtered server-side
+      db
+        .collection(`users/${uid}/reviewQueue`)
+        .where('dueAt', '<=', new Date())
+        .where('completedAt', '==', null)
+        .get(),
+      // Weak sounds for recommendation
+      db
+        .collection(`users/${uid}/soundProgress`)
+        .where('accuracyScore', '<', 60)
+        .orderBy('accuracyScore', 'asc')
+        .limit(1)
+        .get(),
+    ]);
 
-  // Lessons completed
-  const lessonProgressSnap = await db
-    .collection(`users/${uid}/lessonProgress`)
-    .where('status', '==', 'completed')
-    .get();
-  const lessonsCompleted = lessonProgressSnap.size;
+    const userData = userDoc.data() || {};
+    const stats = (userData.stats as Record<string, number>) || {};
 
-  // Words learned
-  const wordProgressSnap = await db
-    .collection(`users/${uid}/wordProgress`)
-    .get();
-  let wordsLearned = 0;
-  wordProgressSnap.forEach((doc) => {
-    const d = doc.data();
-    if ((d.timesCorrect || 0) >= 3 && (d.familiarityScore || 0) >= 70) {
-      wordsLearned++;
-    }
-  });
+    // Use aggregate counters — fall back to 0 if not yet initialised
+    const lessonsCompleted = stats.lessonsCompleted ?? 0;
+    const wordsLearned = stats.wordsLearned ?? 0;
+    const streakDays = stats.streakDays ?? 0;
 
-  // Review due counts
-  const now = new Date();
-  const reviewQueueSnap = await db
-    .collection(`users/${uid}/reviewQueue`)
-    .where('dueAt', '<=', now)
-    .where('completedAt', '==', null)
-    .get();
-
-  const reviewDue = { wordCount: 0, soundCount: 0, sentenceCount: 0, dialogueCount: 0 };
-  reviewQueueSnap.forEach((doc) => {
-    const d = doc.data();
-    if (d.contentType === 'word') reviewDue.wordCount++;
-    else if (d.contentType === 'sound') reviewDue.soundCount++;
-    else if (d.contentType === 'sentence') reviewDue.sentenceCount++;
-    else if (d.contentType === 'dialogue') reviewDue.dialogueCount++;
-  });
-
-  // Weak sounds for recommendation
-  const soundProgressSnap = await db
-    .collection(`users/${uid}/soundProgress`)
-    .where('accuracyScore', '<', 60)
-    .orderBy('accuracyScore', 'asc')
-    .limit(1)
-    .get();
-
-  let recommendedPractice = null;
-  if (!soundProgressSnap.empty) {
-    const weakSound = soundProgressSnap.docs[0].data();
-    recommendedPractice = {
-      type: 'sound',
-      targetId: weakSound.soundId,
-      title: `ฝึกเสียง ${weakSound.label || weakSound.soundId}`,
+    // Count due items by type
+    const reviewDue = {
+      wordCount: 0,
+      soundCount: 0,
+      sentenceCount: 0,
+      dialogueCount: 0,
+      total: 0,
     };
-  }
+    reviewQueueSnap.forEach((doc) => {
+      const d = doc.data();
+      reviewDue.total++;
+      if (d.contentType === 'word') reviewDue.wordCount++;
+      else if (d.contentType === 'sound') reviewDue.soundCount++;
+      else if (d.contentType === 'sentence') reviewDue.sentenceCount++;
+      else if (d.contentType === 'dialogue') reviewDue.dialogueCount++;
+    });
 
-  return {
-    greetingName: userData.displayName || 'นักเรียน',
-    reviewDue,
-    recommendedPractice,
-    recentWords: [],
-    summary: {
-      lessonsCompleted,
-      wordsLearned,
-      streakDays: userData.streakDays || 0,
-    },
-  };
+    // Recommend weakest sound
+    let recommendedPractice = null;
+    if (!soundProgressSnap.empty) {
+      const weakSound = soundProgressSnap.docs[0].data();
+      recommendedPractice = {
+        type: 'sound',
+        targetId: weakSound.soundId,
+        title: `ฝึกเสียง ${weakSound.label || weakSound.soundId}`,
+      };
+    }
+
+    // Determine CTA for the current lesson:
+    // - 'start' if not yet begun
+    // - 'continue' if in progress
+    // - 'review' if completed but has due review items from this lesson
+    let todayLesson: DerivedHomeData['todayLesson'] = null;
+    const currentLessonId = userData.currentLessonId as string | undefined;
+    if (currentLessonId) {
+      const [lessonDoc, progressDoc] = await Promise.all([
+        db.doc(`lessons/${currentLessonId}`).get(),
+        db.doc(`users/${uid}/lessonProgress/${currentLessonId}`).get(),
+      ]);
+      if (lessonDoc.exists) {
+        const lesson = lessonDoc.data()!;
+        const progress = progressDoc.exists ? progressDoc.data()! : null;
+        const status = progress?.status ?? 'not_started';
+        const progressPercent = progress?.completionPercent ?? 0;
+
+        let cta = 'start';
+        if (status === 'completed') {
+          // Show 'review' CTA if there are due review items
+          cta = reviewDue.total > 0 ? 'review' : 'start';
+        } else if (status === 'in_progress') {
+          cta = 'continue';
+        }
+
+        todayLesson = {
+          id: currentLessonId,
+          title: lesson.title ?? '',
+          estimatedMinutes: lesson.estimatedMinutes ?? 0,
+          progressPercent,
+          cta,
+        };
+      }
+    }
+
+    return {
+      greetingName: userData.displayName || 'นักเรียน',
+      todayLesson,
+      reviewDue,
+      recommendedPractice,
+      recentWords: [],
+      summary: { lessonsCompleted, wordsLearned, streakDays },
+    };
+  } catch (error) {
+    logger.error('buildDerivedHome failed', { uid, error });
+    throw error;
+  }
 }

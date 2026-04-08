@@ -1,115 +1,143 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions/v2';
 import { db, FieldValue } from '../utils/firestore';
 import {
   computeNextSm2,
   type Sm2State,
   type Sm2Quality,
 } from '../services/reviewQueueService';
+import { sendPushToUser } from '../services/notificationsService';
 
 /**
  * Spaced-Repetition Scheduler
  *
- * Runs every 6 hours to surface any review queue items that are overdue and
- * have not yet been rescheduled.  For items that are 2+ days overdue the
- * scheduler acts as a "catch-up" pass: it resets the SM-2 interval to 1 day
- * (treating a long absence as a forgotten review) so learners are not
- * bombarded with a huge overdue backlog.
+ * Runs every 12 hours.
  *
- * The function processes at most MAX_USERS users and MAX_ITEMS items per user
- * per run to stay within Cloud Functions memory and execution limits.
+ * 1. Uses a collection-group query on `reviewQueue` to find ONLY documents
+ *    that are actually overdue (instead of iterating all users).
+ * 2. For items overdue by ≥ OVERDUE_RESET_THRESHOLD_DAYS, resets SM-2
+ *    state so learners aren't bombarded.
+ * 3. Sends a push reminder to users who have due items and haven't been
+ *    notified recently (lastReminderSentAt guard is in notificationsService).
+ *
+ * Processes in chunks of BATCH_SIZE to respect Firestore batch limits.
  */
 
-const MAX_USERS = 200;
-const MAX_ITEMS_PER_USER = 50;
 const OVERDUE_RESET_THRESHOLD_DAYS = 2;
+const BATCH_SIZE = 400; // keep safely below the 500 batch-write limit
 
 export const runSpacedRepetitionScheduler = onSchedule(
   {
-    schedule: 'every 6 hours',
+    schedule: 'every 12 hours',
     timeZone: 'Asia/Bangkok',
     memory: '512MiB',
-    timeoutSeconds: 300,
+    timeoutSeconds: 540,
   },
   async () => {
-    const now = new Date();
-    const overdueCutoff = new Date(now);
-    overdueCutoff.setDate(overdueCutoff.getDate() - OVERDUE_RESET_THRESHOLD_DAYS);
+    try {
+      const now = new Date();
+      const overdueCutoff = new Date(now);
+      overdueCutoff.setDate(overdueCutoff.getDate() - OVERDUE_RESET_THRESHOLD_DAYS);
 
-    // Query all users with at least one due review item.
-    // In production you would page through this with a cursor.
-    const usersSnap = await db.collection('users').limit(MAX_USERS).get();
+      // Collection-group query: only documents that are actually due
+      const overdueSnap = await db
+        .collectionGroup('reviewQueue')
+        .where('dueAt', '<=', now)
+        .where('completedAt', '==', null)
+        .limit(5000) // safety cap per run; next run will catch the rest
+        .get();
 
-    const promises = usersSnap.docs.map((userDoc) =>
-      processUserReviews(userDoc.id, now, overdueCutoff)
-    );
+      if (overdueSnap.empty) {
+        logger.info('[SR Scheduler] No overdue items found.');
+        return;
+      }
 
-    await Promise.allSettled(promises);
+      // Group items by uid (extracted from path: users/{uid}/reviewQueue/{id})
+      const byUser = new Map<string, typeof overdueSnap.docs>();
+      for (const doc of overdueSnap.docs) {
+        const pathSegments = doc.ref.path.split('/');
+        const uid = pathSegments[1]; // users/{uid}/reviewQueue/{id}
+        if (!uid) continue;
+        if (!byUser.has(uid)) byUser.set(uid, []);
+        byUser.get(uid)!.push(doc);
+      }
 
-    console.log(
-      `[SR Scheduler] processed ${usersSnap.size} users at ${now.toISOString()}`
-    );
+      let totalReset = 0;
+      let totalNotified = 0;
+
+      for (const [uid, docs] of byUser.entries()) {
+        // Process in chunks to stay within batch limits
+        for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+          const chunk = docs.slice(i, i + BATCH_SIZE);
+          const batch = db.batch();
+          let chunkReset = 0;
+
+          for (const doc of chunk) {
+            const data = doc.data();
+            const dueAt: Date = data.dueAt?.toDate?.() ?? new Date(0);
+
+            // Only reset SM-2 for items that are very long overdue
+            if (dueAt < overdueCutoff) {
+              const current: Sm2State = {
+                interval: data.sm2Interval ?? 1,
+                repetition: data.sm2Repetition ?? 0,
+                efactor: data.sm2Efactor ?? 2.5,
+              };
+
+              const next = computeNextSm2(current, 0 as Sm2Quality);
+              const nextDue = new Date();
+              nextDue.setDate(nextDue.getDate() + next.nextIntervalDays);
+
+              batch.update(doc.ref, {
+                sm2Interval: next.interval,
+                sm2Repetition: next.repetition,
+                sm2Efactor: next.efactor,
+                lastQuality: 0,
+                dueAt: FirebaseFirestore.Timestamp.fromDate(nextDue),
+                scheduledBySystem: true,
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+
+              chunkReset++;
+            }
+          }
+
+          if (chunkReset > 0) {
+            await batch.commit();
+            totalReset += chunkReset;
+          }
+        }
+
+        // Send a push notification to this user about their due items
+        try {
+          const dueCount = docs.length;
+          await sendPushToUser(uid, {
+            notification: {
+              title: 'ถึงเวลาทบทวนแล้ว! 📚',
+              body: `มี ${dueCount} รายการรอการทบทวน มาฝึกกันเลย!`,
+            },
+            data: {
+              route: '/review',
+              dueCount: String(dueCount),
+            },
+          });
+          totalNotified++;
+        } catch (notifError) {
+          // Non-fatal: log and continue
+          logger.warn('[SR Scheduler] Push notification failed', {
+            uid,
+            notifError,
+          });
+        }
+      }
+
+      logger.info(
+        `[SR Scheduler] done at ${now.toISOString()} — ` +
+          `reset ${totalReset} items, notified ${totalNotified} users`
+      );
+    } catch (error) {
+      logger.error('[SR Scheduler] fatal error', { error });
+      throw error;
+    }
   }
 );
-
-async function processUserReviews(
-  uid: string,
-  now: Date,
-  overdueCutoff: Date
-): Promise<void> {
-  // Find review items that are overdue and still uncompleted
-  const overdueSnap = await db
-    .collection(`users/${uid}/reviewQueue`)
-    .where('dueAt', '<=', now)
-    .where('completedAt', '==', null)
-    .limit(MAX_ITEMS_PER_USER)
-    .get();
-
-  if (overdueSnap.empty) return;
-
-  const batch = db.batch();
-  let batchCount = 0;
-
-  for (const doc of overdueSnap.docs) {
-    const data = doc.data();
-    const dueAt: Date = data.dueAt?.toDate?.() ?? new Date(0);
-
-    // Long overdue: treat as forgotten, reset SM-2 to interval 1
-    if (dueAt < overdueCutoff) {
-      const current: Sm2State = {
-        interval: data.sm2Interval ?? 1,
-        repetition: data.sm2Repetition ?? 0,
-        efactor: data.sm2Efactor ?? 2.5,
-      };
-
-      // Quality 0 = complete blackout (forgotten after long absence).
-      // SM-2 resets interval to 1 day for quality < 3, so next.nextIntervalDays
-      // will always be 1 here — use it explicitly for algorithm consistency.
-      const next = computeNextSm2(current, 0 as Sm2Quality);
-
-      const nextDue = new Date();
-      nextDue.setDate(nextDue.getDate() + next.nextIntervalDays);
-
-      batch.update(doc.ref, {
-        sm2Interval: next.interval,
-        sm2Repetition: next.repetition,
-        sm2Efactor: next.efactor,
-        lastQuality: 0,
-        dueAt: FirebaseFirestore.Timestamp.fromDate(nextDue),
-        // Mark as "needs review" but NOT as completed — keep in active queue
-        scheduledBySystem: true,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      batchCount++;
-    }
-    // Items that are overdue by less than OVERDUE_RESET_THRESHOLD_DAYS are
-    // left untouched; they surface naturally when the learner opens the app.
-  }
-
-  if (batchCount > 0) {
-    await batch.commit();
-    console.log(
-      `[SR Scheduler] Reset ${batchCount} long-overdue items for user ${uid}`
-    );
-  }
-}
