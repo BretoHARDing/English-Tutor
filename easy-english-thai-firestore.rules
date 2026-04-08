@@ -424,6 +424,72 @@ service cloud.firestore {
         && (request.resource.data.hintText is string || request.resource.data.hintText == null);
     }
 
+    // ── Conversation collection validators ────────────────────────────────
+
+    function validConversationContextType(v) {
+      return v in [
+        'restaurant', 'directions', 'shopping', 'airport',
+        'hotel', 'clinic', 'school', 'market', 'general'
+      ];
+    }
+
+    function validConversation(conversationId) {
+      return request.resource.data.id == conversationId
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.description is string
+        && validConversationContextType(request.resource.data.contextType)
+        && validDialogueMode(request.resource.data.mode)
+        && validDifficultyLevel(request.resource.data.level)
+        && request.resource.data.isPublished is bool
+        && request.resource.data.targetPhrases is list
+        && request.resource.data.turnCount is int
+        && isTimestampField(request.resource.data.createdAt)
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validConversationTurn(turnId) {
+      return request.resource.data.id == turnId
+        && request.resource.data.turnOrder is int
+        && validSpeaker(request.resource.data.speaker)
+        && (request.resource.data.text is string || request.resource.data.text == null)
+        && (request.resource.data.thaiText is string || request.resource.data.thaiText == null)
+        && (request.resource.data.audioUrl is string || request.resource.data.audioUrl == null)
+        && (request.resource.data.expectedAnswers is list || request.resource.data.expectedAnswers == null)
+        && (request.resource.data.hintText is string || request.resource.data.hintText == null);
+    }
+
+    function conversationPublished(conversationId) {
+      return exists(/databases/$(database)/documents/conversations/$(conversationId))
+        && get(/databases/$(database)/documents/conversations/$(conversationId)).data.isPublished == true;
+    }
+
+    function validConversationProgress(conversationId) {
+      return request.resource.data.conversationId == conversationId
+        && request.resource.data.status is string
+        && request.resource.data.turnsCompleted is int
+        && request.resource.data.score is number
+        && isTimestampField(request.resource.data.updatedAt);
+    }
+
+    function validConversationTurnResponse(turnId) {
+      return request.resource.data.turnId == turnId
+        && (request.resource.data.transcriptText is string || request.resource.data.transcriptText == null)
+        && request.resource.data.accepted is bool
+        && (request.resource.data.score is number || request.resource.data.score == null)
+        && isTimestampField(request.resource.data.createdAt);
+    }
+
+    // ── SM-2 review queue validator (extended fields) ─────────────────────
+
+    function validReviewQueueSm2(reviewId) {
+      return validReviewQueue(reviewId)
+        && (request.resource.data.sm2Interval is int || request.resource.data.sm2Interval == null)
+        && (request.resource.data.sm2Repetition is int || request.resource.data.sm2Repetition == null)
+        && (request.resource.data.sm2Efactor is number || request.resource.data.sm2Efactor == null)
+        && (request.resource.data.lastQuality is int || request.resource.data.lastQuality == null);
+    }
+
     function validMinimalPairGroup(groupId) {
       return request.resource.data.id == groupId
         && request.resource.data.title is string
@@ -527,7 +593,7 @@ service cloud.firestore {
 
       match /reviewQueue/{reviewId} {
         allow read: if isOwner(uid) || isAdmin();
-        allow create, update: if isOwner(uid) && validReviewQueue(reviewId);
+        allow create, update: if isOwner(uid) && validReviewQueueSm2(reviewId);
         allow delete: if false;
       }
 
@@ -558,6 +624,21 @@ service cloud.firestore {
       match /derived/{docId} {
         allow read: if isOwner(uid) || isAdmin();
         allow write: if isAdmin();
+      }
+
+      // Conversation progress — tracks learner completion per conversation.
+      match /conversationProgress/{conversationId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && validConversationProgress(conversationId);
+        allow delete: if false;
+
+        match /turns/{turnId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update: if isOwner(uid)
+            && validConversationTurnResponse(turnId);
+          allow delete: if false;
+        }
       }
     }
 
@@ -685,5 +766,21 @@ service cloud.firestore {
     match /contentQaIssues/{issueId} {
       allow read, write: if isAdmin();
     }
+
+    // ── Conversations collection ──────────────────────────────────────────
+    // Real-life role-play scenarios (ordering food, asking directions, etc.)
+    // Learners can read published conversations; only admins can write.
+    match /conversations/{conversationId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update: if isAdmin() && validConversation(conversationId);
+      allow delete: if false;
+
+      match /turns/{turnId} {
+        allow read: if conversationPublished(conversationId) || isAdmin();
+        allow create, update: if isAdmin() && validConversationTurn(turnId);
+        allow delete: if false;
+      }
+    }
+
   }
 }
