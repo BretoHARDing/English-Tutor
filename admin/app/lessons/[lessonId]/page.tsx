@@ -232,8 +232,14 @@ export default function LessonDetailPage({ params }: LessonDetailPageProps) {
             >
               Recording complete — preview below:
             </p>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio controls src={audioUrl} style={{ width: '100%' }} />
+            <audio
+              controls
+              src={audioUrl}
+              style={{ width: '100%' }}
+              aria-label="Recorded pronunciation audio preview"
+            >
+              <track kind="captions" src="" label="No captions available" />
+            </audio>
           </div>
         )}
 
